@@ -143,6 +143,9 @@
             animation: slideIn 0.3s ease-out;
             transition: all 0.2s ease;
         }
+        .track-section.active-track {
+            box-shadow: 0 0 0 2px #fff, 0 0 10px #ff0;
+        }
         @keyframes slideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
 
         .track-header {
@@ -425,6 +428,7 @@
             root: 0, scale: 'major', globalTranspose: 0,
             sf2: null, sdta: 0, samples: [],
             tracks: [],
+            activeTrack: 0,
             midiVoices: {}, // Track active MIDI notes: key=note, val={src, gain, trackId, snapped}
             activeMidiNotes: new Set()
         };
@@ -543,6 +547,7 @@
             renderTrackHTML(id);
             renderGrid(id);
             updateTrackStatus(id);
+            if(sys.tracks.length === 1) setActiveTrack(0);
         }
 
         function renderTrackHTML(id) {
@@ -641,11 +646,12 @@
                 const transposed = base + t.transpose + parseInt(sys.globalTranspose);
                 const snapped = snapToScale(transposed);
                 const noteName = NOTES[snapped % 12];
-                
+
                 el.innerHTML = `<span style="font-size:9px; position:absolute; top:2px; left:2px; opacity:0.5;">${sIdx+1}</span>
                                 <span style="font-size:10px; font-weight:bold; position:absolute; bottom:2px; right:2px; color:white;">${step.active?noteName:''}</span>`;
-                
+
                 el.onclick = () => {
+                    setActiveTrack(id);
                     if(t.sel !== sIdx) t.sel = sIdx;
                     else step.active = !step.active;
                     
@@ -656,6 +662,14 @@
                 };
                 div.appendChild(el);
             });
+        }
+
+        function setActiveTrack(id) {
+            if(!sys.tracks[id]) return;
+            sys.activeTrack = id;
+            document.querySelectorAll('.track-section').forEach(sec => sec.classList.remove('active-track'));
+            const sec = document.getElementById('track-sec-'+id);
+            if(sec) sec.classList.add('active-track');
         }
 
         function updatePitchLCD(id, note) {
@@ -779,12 +793,13 @@
         function midiNoteOn(note) {
             // Map to Track 0 settings (ID 0)
             if(sys.midiVoices[note]) return; // Already playing
-            const tIdx = 0;
+            const tIdx = sys.tracks[sys.activeTrack] ? sys.activeTrack : 0;
             const t = sys.tracks[tIdx];
+            if(!t) return;
             const effNote = snapToScale(note + t.transpose + parseInt(sys.globalTranspose));
             const voice = playSound(tIdx, effNote, sys.ctx.currentTime, 0, true);
             if(voice) {
-                sys.midiVoices[note] = { ...voice, snapped: effNote };
+                sys.midiVoices[note] = { ...voice, snapped: effNote, trackId: tIdx };
                 sys.activeMidiNotes.add(effNote);
                 setPianoState(effNote, true);
                 refreshMidiReadout();
@@ -794,7 +809,7 @@
         function midiNoteOff(note) {
             const voice = sys.midiVoices[note];
             if(!voice) return;
-            const t = sys.tracks[0];
+            const t = sys.tracks[voice.trackId ?? 0] || sys.tracks[0];
             const rel = getEnvSeconds(t.env.r, 'r');
             const now = sys.ctx.currentTime;
             
@@ -915,7 +930,9 @@
 
         document.body.addEventListener('click', (e) => {
             const el = e.target;
-            
+            const tWrap = el.closest('.track-section');
+            if(tWrap) setActiveTrack(parseInt(tWrap.id.replace('track-sec-','')));
+
             if(el.classList.contains('btn-min')) {
                 const tid = parseInt(el.dataset.track);
                 const body = document.getElementById('tbody-'+tid);
