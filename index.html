@@ -47,6 +47,15 @@
             position: relative;
         }
 
+        @media (min-width: 900px) {
+            body { justify-content: center; }
+            .device-case {
+                max-width: none;
+                width: calc(100% - 40px);
+                margin: 0 20px;
+            }
+        }
+
         /* --- HEADER --- */
         .transport-bar {
             background: var(--win-gray);
@@ -539,6 +548,30 @@
             return 0;
         }
 
+        function buildSampleBuffer(sample) {
+            if (sample.buffer) return sample.buffer;
+            const len = sample.end - sample.start;
+            if (len <= 0 || !sys.ctx) return null;
+
+            // Pad the buffer with a short sustain tail so envelopes can fade naturally
+            const pad = Math.floor(sample.rate * 2);
+            const buffer = sys.ctx.createBuffer(1, len + pad, sample.rate);
+            const channel = buffer.getChannelData(0);
+            const dv = new DataView(sys.sf2);
+            const off = sys.sdta + (sample.start * 2);
+
+            for (let i = 0; i < len; i++) {
+                if (off + (i * 2) < sys.sf2.byteLength) channel[i] = dv.getInt16(off + (i * 2), true) / 32768.0;
+            }
+
+            // Hold the final value through the padded tail to avoid abrupt drops
+            const last = channel[len - 1] || 0;
+            for (let i = len; i < len + pad; i++) channel[i] = last;
+
+            sample.buffer = buffer;
+            return buffer;
+        }
+
         function playSound(tIdx, note, time, gateDuration, isMidi) {
             const t = sys.tracks[tIdx];
             const freq = 440 * Math.pow(2, (note-69)/12);
@@ -556,19 +589,27 @@
             } else if (t.mode === 'sampler') {
                 const s = sys.samples[t.sampleIdx];
                 if(!s) return null;
-                const len = s.end - s.start;
-                if(len<=0) return null;
-                const b = sys.ctx.createBuffer(1, len, s.rate);
-                const d = b.getChannelData(0);
-                const dv = new DataView(sys.sf2);
-                const off = sys.sdta + (s.start*2);
-                for(let i=0; i<len; i++) {
-                    if(off+(i*2) < sys.sf2.byteLength) d[i] = dv.getInt16(off+(i*2), true)/32768.0;
-                }
+                const buffer = buildSampleBuffer(s);
+                if(!buffer) return null;
                 src = sys.ctx.createBufferSource();
-                src.buffer = b;
+                src.buffer = buffer;
                 const root = s.root||60;
                 src.playbackRate.value = Math.pow(2, (note-root)/12);
+
+                // Apply loop points when present to sustain SoundFont envelopes naturally
+                const hasLoop = s.loopEnd > s.loopStart && s.loopEnd <= s.end;
+                if(hasLoop) {
+                    src.loop = true;
+                    const loopStartSec = (s.loopStart - s.start) / s.rate;
+                    const loopEndSec = (s.loopEnd - s.start) / s.rate;
+                    src.loopStart = Math.max(0, loopStartSec);
+                    src.loopEnd = Math.max(src.loopStart + 0.001, loopEndSec);
+                } else if (gateDuration <= 0) {
+                    // Allow held MIDI notes to sustain even when a SoundFont lacks loop metadata
+                    src.loop = true;
+                    src.loopStart = 0;
+                    src.loopEnd = buffer.duration;
+                }
             }
 
             const gain = sys.ctx.createGain();
@@ -824,10 +865,15 @@
                 const num = size/46;
                 for(let i=0; i<num; i++) {
                     const b=shdr+(i*46);
-                    let nm=""; for(let j=0;j<20;j++){let c=dv.getUint8(b+j);if(c===0)break;nm+=String.fromCharCode(c);}
+                    let nm=""; for(let j=0;j<20;j++){let c=dv.getUint8(b+j);if(c===0)break;nm+=String.fromCharCode(c);}    
                     if(nm!=="EOS") sys.samples.push({
-                        name:nm, start:dv.getUint32(b+20,true), end:dv.getUint32(b+24,true),
-                        rate:dv.getUint32(b+36,true), root:dv.getUint8(b+40)
+                        name:nm,
+                        start:dv.getUint32(b+20,true),
+                        end:dv.getUint32(b+24,true),
+                        loopStart:dv.getUint32(b+28,true),
+                        loopEnd:dv.getUint32(b+32,true),
+                        rate:dv.getUint32(b+36,true),
+                        root:dv.getUint8(b+40)
                     });
                 }
             }
