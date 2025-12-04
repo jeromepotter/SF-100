@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SF-100 v18 MIDI</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --win-gray: #c0c0c0;
+            --win-light: #ffffff;
+            --win-dark: #808080;
+            --win-darker: #404040;
+            --lcd-bg: #2b332b;
+            --lcd-on: #39ff14;
+            /* Track Accents */
+            --trk-0: #800000; /* Red */
+            --trk-1: #000080; /* Blue */
+            --trk-2: #806000; /* Gold */
+            --trk-3: #4b0082; /* Purple */
+            --trk-4: #004d40; /* Teal */
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: #222;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            width: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+        }
+
+        .device-case {
+            background: var(--win-gray);
+            width: 100%;
+            max-width: 500px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid var(--win-darker);
+            border-left: 2px solid var(--win-light);
+            position: relative;
+        }
+
+        /* --- HEADER --- */
+        .transport-bar {
+            background: var(--win-gray);
+            padding: 6px;
+            border-bottom: 2px solid var(--win-dark);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+            z-index: 50;
+            height: 48px;
+        }
+
+        .brand-badge {
+            font-family: 'Arial Black', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            font-size: 16px;
+            color: #555;
+            margin-right: 5px;
+            white-space: nowrap;
+        }
+
+        .btn-90s {
+            background: var(--win-gray);
+            border: 2px outset #fff;
+            font-size: 11px;
+            font-weight: bold;
+            color: black;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+        }
+        .btn-90s:active, .btn-90s.active { border: 2px inset #fff; background: #ccc; transform: translate(1px, 1px); }
+        .btn-play { flex: 2; color: #006400; border-width: 3px; font-size: 14px; }
+        .btn-stop { flex: 1; color: #8b0000; }
+        .btn-init { flex: 3; background: #e0e080; border-color: #999; }
+
+        /* --- GLOBAL --- */
+        .global-strip {
+            background: #a0a0a0;
+            padding: 4px 8px;
+            border-bottom: 1px solid var(--win-darker);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex-shrink: 0;
+            z-index: 40;
+        }
+        .gs-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; }
+        .gc-group { display: flex; align-items: center; gap: 4px; }
+        
+        .scope-container {
+            height: 40px; 
+            background: #000;
+            border-bottom: 2px solid var(--win-dark);
+            flex-shrink: 0;
+            position: relative;
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        /* --- WORKSPACE --- */
+        .workspace {
+            flex: 1;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            background: #888;
+            padding-bottom: 120px; 
+        }
+
+        .track-section {
+            border: 2px solid var(--win-darker);
+            border-radius: 4px;
+            background: var(--win-gray);
+            padding: 2px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.4);
+            animation: slideIn 0.3s ease-out;
+            transition: all 0.2s ease;
+        }
+        @keyframes slideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+        .track-header {
+            color: white;
+            padding: 4px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-shadow: 1px 1px 0 #000;
+        }
+        
+        .btn-min {
+            width: 20px; height: 20px;
+            background: #ccc; color: #000;
+            border: 1px outset #fff;
+            text-align: center; line-height: 18px;
+            font-family: monospace; font-size: 14px;
+            cursor: pointer; margin-right: 6px;
+            text-shadow: none;
+        }
+        .btn-min:active { border: 1px inset #fff; }
+
+        .vol-wrapper {
+            display: flex; align-items: center; gap: 4px;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px; border-radius: 10px;
+        }
+        
+        .th-0 { background: linear-gradient(90deg, var(--trk-0), #500); }
+        .th-1 { background: linear-gradient(90deg, var(--trk-1), #005); }
+        .th-2 { background: linear-gradient(90deg, var(--trk-2), #640); }
+        .th-3 { background: linear-gradient(90deg, var(--trk-3), #808); }
+        .th-4 { background: linear-gradient(90deg, var(--trk-4), #088); }
+
+        .module {
+            border: 1px solid var(--win-dark);
+            background: rgba(255,255,255,0.3);
+            margin: 5px; padding: 8px; border-radius: 2px;
+        }
+
+        .compact-row { display: flex; gap: 5px; align-items: center; margin-bottom: 5px; }
+
+        /* --- SLIDERS --- */
+        input[type=range] {
+            -webkit-appearance: none; background: transparent;
+            touch-action: none; 
+        }
+        input[type=range]:focus { outline: none; }
+
+        .adsr-container {
+            display: flex; justify-content: space-between; height: 80px;
+            background: #bbb; border: 1px inset; padding: 4px;
+        }
+        .fader-group { display: flex; flex-direction: column; align-items: center; flex: 1; }
+        .fader-label { font-size: 8px; font-weight: bold; color: #222; margin-top: 2px; }
+        
+        input[type=range].vertical {
+            -webkit-appearance: slider-vertical; width: 30px; height: 100%; cursor: pointer;
+        }
+
+        input[type=range].horiz {
+            width: 100%; height: 30px; margin: 0;
+        }
+        input[type=range].horiz::-webkit-slider-runnable-track {
+            height: 8px; background: #222; border: 1px inset; border-radius: 4px;
+        }
+        input[type=range].horiz::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 22px; height: 22px; 
+            background: #ccc; border: 2px outset #eee; 
+            margin-top: -8px; border-radius: 2px;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+        }
+        
+        input[type=range].mini-vol {
+            width: 60px; height: 20px;
+        }
+        input[type=range].mini-vol::-webkit-slider-runnable-track {
+            height: 4px; background: #999; border: 1px solid #555;
+        }
+        input[type=range].mini-vol::-webkit-slider-thumb {
+            width: 12px; height: 12px; margin-top: -5px; background: #fff; border: 1px solid #000;
+        }
+
+        /* --- GRID --- */
+        .seq-grid-4x4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; aspect-ratio: 4/2.5; }
+        .step-pad {
+            background: #555; border: 2px outset #777; border-radius: 3px; position: relative; cursor: pointer;
+            touch-action: manipulation;
+        }
+        
+        .ts-0 .step-pad.active { background: #ff4444; border-color: #ff8888; box-shadow: inset 0 0 5px #500; }
+        .ts-0 .step-pad.selected { border: 2px solid #ffcc00; z-index: 2; }
+        .ts-1 .step-pad.active { background: #4444ff; border-color: #8888ff; box-shadow: inset 0 0 5px #005; }
+        .ts-1 .step-pad.selected { border: 2px solid #00ccff; z-index: 2; }
+        .ts-2 .step-pad.active { background: #ffaa00; border-color: #ffee00; box-shadow: inset 0 0 5px #540; }
+        .ts-2 .step-pad.selected { border: 2px solid #fff; z-index: 2; }
+        .ts-3 .step-pad.active { background: #9933ff; border-color: #cc88ff; box-shadow: inset 0 0 5px #305; }
+        .ts-3 .step-pad.selected { border: 2px solid #fff; z-index: 2; }
+        .ts-4 .step-pad.active { background: #00ccaa; border-color: #88ffee; box-shadow: inset 0 0 5px #044; }
+        .ts-4 .step-pad.selected { border: 2px solid #fff; z-index: 2; }
+
+        .step-pad.playing { filter: brightness(1.8); border-color: #fff; }
+
+        .tiny-btn {
+            font-size: 9px; padding: 6px; border: 1px outset; background: #ddd; 
+            cursor: pointer; flex: 1; text-align: center;
+        }
+        .tiny-btn.active { background: #999; border: 1px inset; color: white; }
+
+        .add-track-area { 
+            padding: 20px; 
+            text-align: center; 
+            margin-top: 10px;
+        }
+        .btn-add {
+            width: 100%; padding: 15px; background: #e0e0e0; border: 3px dashed #999;
+            font-weight: bold; color: #555; cursor: pointer; font-size: 14px;
+        }
+        .btn-add:active { background: #ccc; }
+
+        select { font-size: 11px; padding: 2px; height: 24px; border: 1px inset; }
+
+        .track-body.collapsed { display: none; }
+
+    </style>
+</head>
+<body>
+
+    <div class="device-case">
+        
+        <!-- HEADER -->
+        <div class="transport-bar">
+            <span class="brand-badge">SF-100</span>
+            <button id="btn-init" class="btn-90s btn-init">⚠ ENABLE AUDIO</button>
+            <div id="transport-controls" style="display:none; width:100%; gap:8px;">
+                <button id="btn-play" class="btn-90s btn-play">► PLAY</button>
+                <button id="btn-stop" class="btn-90s btn-stop">■ STOP</button>
+            </div>
+        </div>
+
+        <!-- GLOBAL -->
+        <div class="global-strip">
+            <!-- Row 1: File & BPM -->
+            <div class="gs-row">
+                <div class="gc-group">
+                    <button class="tiny-btn" onclick="document.getElementById('sf2-input').click()" style="background:#eef; width:60px;">📂 LOAD</button>
+                    <input type="file" id="sf2-input" accept=".sf2" style="display: none;">
+                    <div id="global-lcd" style="font-size:10px; width:50px; white-space:nowrap; overflow:hidden; background:white; padding:2px; border:1px inset;">EMPTY</div>
+                </div>
+                <div class="gc-group" style="flex:1;">
+                    <span style="font-size:10px; font-weight:bold;">BPM</span>
+                    <input type="range" class="horiz" id="bpm-slider" min="60" max="240" value="120" style="height:20px;">
+                    <span id="bpm-disp" style="font-family:monospace;font-size:12px;width:25px;">120</span>
+                </div>
+            </div>
+            <!-- Row 2: Shift & Key -->
+            <div class="gs-row">
+                <div class="gc-group" style="flex:1;">
+                    <span style="font-size:10px; font-weight:bold; color:#000080;">SHIFT</span>
+                    <input type="range" class="horiz" id="global-shift" min="-12" max="12" value="0" style="height:20px;">
+                    <span id="shift-disp" style="font-family:monospace;font-size:12px;width:25px;">0</span>
+                </div>
+                <div class="gc-group">
+                    <select id="key-select" style="width:40px;"><option value="0">C</option><option value="1">C#</option><option value="2">D</option><option value="3">D#</option><option value="4">E</option><option value="5">F</option><option value="6">F#</option><option value="7">G</option><option value="8">G#</option><option value="9">A</option><option value="10">A#</option><option value="11">B</option></select>
+                    <select id="scale-select" style="width:50px;"><option value="major">Maj</option><option value="minor">Min</option><option value="pentatonic">Pen</option><option value="chromatic">Chr</option></select>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCOPE -->
+        <div class="scope-container">
+            <canvas id="scope"></canvas>
+        </div>
+
+        <!-- WORKSPACE -->
+        <div class="workspace" id="track-container">
+            <!-- Dynamic Tracks -->
+            
+            <div class="add-track-area" id="add-area">
+                <button class="btn-add" id="btn-add-track">+ ADD SEQUENCER (MAX 5)</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+        const SCALES = {
+            chromatic: [0,1,2,3,4,5,6,7,8,9,10,11],
+            major: [0,2,4,5,7,9,11],
+            minor: [0,2,3,5,7,8,10],
+            pentatonic: [0,3,5,7,10]
+        };
+
+        const sys = {
+            ctx: null, mainGain: null, analyser: null,
+            ready: false, playing: false,
+            bpm: 120, step: 0, nextTime: 0, timer: null,
+            root: 0, scale: 'major', globalTranspose: 0,
+            sf2: null, sdta: 0, samples: [],
+            tracks: [],
+            midiVoices: {} // Track active MIDI notes: key=note, val={src, gain, trackId}
+        };
+
+        const ui = {
+            trackContainer: document.getElementById('track-container'),
+            addArea: document.getElementById('add-area'),
+            addBtn: document.getElementById('btn-add-track'),
+            play: document.getElementById('btn-play'),
+            stop: document.getElementById('btn-stop'),
+            init: document.getElementById('btn-init'),
+            ctrls: document.getElementById('transport-controls'),
+            bpm: document.getElementById('bpm-slider'),
+            bpmDisp: document.getElementById('bpm-disp'),
+            key: document.getElementById('key-select'),
+            scale: document.getElementById('scale-select'),
+            gShift: document.getElementById('global-shift'),
+            gShiftDisp: document.getElementById('shift-disp'),
+            globalLcd: document.getElementById('global-lcd'),
+            sf2Input: document.getElementById('sf2-input'),
+            canvas: document.getElementById('scope')
+        };
+
+        // --- MIDI SETUP ---
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+        }
+        function onMIDISuccess(midiAccess) {
+            for (let input of midiAccess.inputs.values()) {
+                input.onmidimessage = getMIDIMessage;
+            }
+        }
+        function onMIDIFailure() { console.warn("MIDI not supported"); }
+        function getMIDIMessage(msg) {
+            if(!sys.ready) return;
+            const cmd = msg.data[0] & 0xf0;
+            const note = msg.data[1];
+            const vel = (msg.data.length > 2) ? msg.data[2] : 0;
+            if (cmd === 144 && vel > 0) midiNoteOn(note); // Note On
+            if (cmd === 128 || (cmd === 144 && vel === 0)) midiNoteOff(note); // Note Off
+        }
+
+        // --- TRACK MANAGEMENT ---
+        function createTrack(id) {
+            const t = { 
+                id: id, 
+                grid: [], 
+                sel: 0, 
+                mode: 'synth', 
+                wave: id%2===0 ? 'sine' : 'square',
+                sampleIdx: 0, 
+                env: {a:5, d:20, s:70, r:40}, 
+                transpose: 0,
+                gain: 0.8, 
+                minimized: false
+            };
+            
+            const baseNote = id===0 ? 60 : (id===1 ? 36 : (id===2 ? 48 : 60));
+            for(let i=0; i<16; i++) t.grid.push({ active: false, note: baseNote });
+            
+            sys.tracks.push(t);
+            renderTrackHTML(id);
+            renderGrid(id);
+            updateTrackStatus(id);
+        }
+
+        function renderTrackHTML(id) {
+            const html = `
+            <div class="track-section ts-${id}" id="track-sec-${id}">
+                <div class="track-header th-${id}">
+                    <div style="display:flex; align-items:center;">
+                        <button class="btn-min" data-track="${id}">-</button>
+                        <span>TRK ${id+1}</span>
+                    </div>
+                    <div class="vol-wrapper">
+                        <span style="font-size:9px;">VOL</span>
+                        <input type="range" class="mini-vol" data-track="${id}" min="0" max="100" value="80">
+                        <span id="lcd-${id}" style="margin-left:5px; font-weight:normal; opacity:0.8;">INT: ${sys.tracks[id].wave.toUpperCase()}</span>
+                    </div>
+                </div>
+                
+                <div class="track-body" id="tbody-${id}">
+                    <div class="module">
+                        <div class="compact-row">
+                            <button class="tiny-btn wave-btn ${id%2===0?'active':''}" data-track="${id}" data-type="sine">SIN</button>
+                            <button class="tiny-btn wave-btn ${id%2!==0?'active':''}" data-track="${id}" data-type="square">SQR</button>
+                            <button class="tiny-btn wave-btn" data-track="${id}" data-type="sawtooth">SAW</button>
+                            <select class="preset-select" data-track="${id}" disabled style="flex:2;">
+                                <option>${sys.samples.length>0 ? 'Select Preset...' : 'Load SF2 First...'}</option>
+                            </select>
+                        </div>
+                        <div class="adsr-container">
+                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="a" min="0" max="100" value="5"><span class="fader-label">A</span></div>
+                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="d" min="0" max="100" value="20"><span class="fader-label">D</span></div>
+                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="s" min="0" max="100" value="70"><span class="fader-label">S</span></div>
+                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="r" min="0" max="100" value="40"><span class="fader-label">R</span></div>
+                        </div>
+                    </div>
+
+                    <div class="module">
+                        <div class="seq-grid-4x4" id="grid-${id}"></div>
+                        <div style="margin-top: 8px;">
+                            <div class="compact-row">
+                                <span style="font-size:10px; font-weight:bold;">PITCH:</span>
+                                <input type="range" class="horiz pitch-slider" data-track="${id}" min="24" max="84" value="${id===1?36:60}">
+                                <span class="pitch-lcd" id="pitch-lcd-${id}" style="font-size:10px; font-family:monospace; width:25px; background:white; padding:0 2px; text-align:center;">${id===1?'C2':'C4'}</span>
+                            </div>
+                            <div class="compact-row">
+                                <span style="font-size:10px; font-weight:bold;">TRANS:</span>
+                                <input type="range" class="horiz trans-slider" data-track="${id}" min="-12" max="12" value="0">
+                            </div>
+                            <div class="compact-row">
+                                <button class="tiny-btn rnd-btn" data-track="${id}">RANDOM</button>
+                                <button class="tiny-btn clr-btn" data-track="${id}">CLEAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            ui.trackContainer.insertBefore(div.firstElementChild, ui.addArea);
+            if(sys.samples.length > 0) populateSelect(id);
+        }
+
+        ui.addBtn.onclick = () => {
+            if(sys.tracks.length < 5) {
+                createTrack(sys.tracks.length);
+                if(sys.tracks.length >= 5) ui.addArea.style.display = 'none';
+            }
+        };
+
+        // --- LOGIC ---
+        function snapToScale(raw) {
+            const sc = SCALES[sys.scale];
+            const rt = parseInt(sys.root);
+            let best = raw; let min = 999;
+            for(let i = raw - 12; i <= raw + 12; i++) {
+                let n = ((i % 12) - rt + 12) % 12;
+                if(sc.includes(n)) {
+                    let d = Math.abs(i - raw);
+                    if(d < min) { min = d; best = i; }
+                }
+            }
+            return best;
+        }
+
+        function renderGrid(id) {
+            const t = sys.tracks[id];
+            const div = document.getElementById('grid-'+id);
+            div.innerHTML = "";
+            t.grid.forEach((step, sIdx) => {
+                const el = document.createElement('div');
+                el.className = 'step-pad';
+                if(step.active) el.classList.add('active');
+                if(t.sel === sIdx) el.classList.add('selected');
+                
+                const base = step.note; 
+                const transposed = base + t.transpose + parseInt(sys.globalTranspose);
+                const snapped = snapToScale(transposed);
+                const noteName = NOTES[snapped % 12];
+                
+                el.innerHTML = `<span style="font-size:9px; position:absolute; top:2px; left:2px; opacity:0.5;">${sIdx+1}</span>
+                                <span style="font-size:10px; font-weight:bold; position:absolute; bottom:2px; right:2px; color:white;">${step.active?noteName:''}</span>`;
+                
+                el.onclick = () => {
+                    if(t.sel !== sIdx) t.sel = sIdx;
+                    else step.active = !step.active;
+                    
+                    const slider = document.querySelector(`.pitch-slider[data-track="${id}"]`);
+                    slider.value = step.note; 
+                    updatePitchLCD(id, step.note);
+                    renderGrid(id);
+                };
+                div.appendChild(el);
+            });
+        }
+
+        function updatePitchLCD(id, note) {
+            const t = sys.tracks[id];
+            const eff = snapToScale(note + t.transpose + parseInt(sys.globalTranspose));
+            const n = NOTES[eff%12];
+            const o = Math.floor(eff/12)-1;
+            document.getElementById('pitch-lcd-'+id).innerText = n+o;
+        }
+
+        function updateTrackStatus(id) {
+            const t = sys.tracks[id];
+            const lcd = document.getElementById('lcd-'+id);
+            if(t.mode === 'synth') lcd.innerText = "INT: " + t.wave.toUpperCase();
+            else if(t.mode === 'sampler') lcd.innerText = sys.samples[t.sampleIdx].name.substring(0,10);
+        }
+
+        // --- AUDIO ENGINE ---
+        function getEnvSeconds(val, type) {
+            if(type === 'a') return 0.005 + Math.pow(val / 100, 3) * 2.0; 
+            if(type === 'd') return 0.01 + Math.pow(val / 100, 2) * 2.0;
+            if(type === 's') return val / 100;
+            if(type === 'r') return 0.05 + Math.pow(val / 100, 2) * 4.0;
+            return 0;
+        }
+
+        function playSound(tIdx, note, time, gateDuration, isMidi) {
+            const t = sys.tracks[tIdx];
+            const freq = 440 * Math.pow(2, (note-69)/12);
+            const atk = getEnvSeconds(t.env.a, 'a');
+            const dec = getEnvSeconds(t.env.d, 'd');
+            const sus = getEnvSeconds(t.env.s, 's');
+            const rel = getEnvSeconds(t.env.r, 'r');
+            const vol = t.gain;
+
+            let src;
+            if(t.mode === 'synth') {
+                src = sys.ctx.createOscillator();
+                src.type = t.wave;
+                src.frequency.value = freq;
+            } else if (t.mode === 'sampler') {
+                const s = sys.samples[t.sampleIdx];
+                if(!s) return null;
+                const len = s.end - s.start;
+                if(len<=0) return null;
+                const b = sys.ctx.createBuffer(1, len, s.rate);
+                const d = b.getChannelData(0);
+                const dv = new DataView(sys.sf2);
+                const off = sys.sdta + (s.start*2);
+                for(let i=0; i<len; i++) {
+                    if(off+(i*2) < sys.sf2.byteLength) d[i] = dv.getInt16(off+(i*2), true)/32768.0;
+                }
+                src = sys.ctx.createBufferSource();
+                src.buffer = b;
+                const root = s.root||60;
+                src.playbackRate.value = Math.pow(2, (note-root)/12);
+            }
+
+            const gain = sys.ctx.createGain();
+            
+            // Start
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(vol, time + atk);
+            gain.gain.setTargetAtTime(Math.max(0.01, sus*vol), time + atk, dec/3);
+
+            // Release if we know duration (Sequencer)
+            if (gateDuration > 0) {
+                gain.gain.setTargetAtTime(0, time + gateDuration, rel/3);
+                src.start(time);
+                src.stop(time + gateDuration + (rel*6));
+            } else {
+                // MIDI Sustain (Manual Release later)
+                src.start(time);
+            }
+
+            src.connect(gain); gain.connect(sys.mainGain);
+            
+            return { src, gain };
+        }
+
+        // Sequencer Trigger
+        function triggerNote(tIdx, note, time, durOverride) {
+            const finalNote = snapToScale(note);
+            const gate = durOverride || (60/sys.bpm)*0.25*0.6;
+            playSound(tIdx, finalNote, time, gate, false);
+        }
+
+        // MIDI Trigger
+        function midiNoteOn(note) {
+            // Map to Track 0 settings (ID 0)
+            if(sys.midiVoices[note]) return; // Already playing
+            const tIdx = 0;
+            // No scale snap for MIDI typically, but lets follow Track 0 sound
+            const voice = playSound(tIdx, note, sys.ctx.currentTime, 0, true);
+            if(voice) sys.midiVoices[note] = voice;
+            
+            // Visual feedback on Global LCD
+            ui.globalLcd.innerText = "MIDI: " + note;
+        }
+
+        function midiNoteOff(note) {
+            const voice = sys.midiVoices[note];
+            if(!voice) return;
+            const t = sys.tracks[0];
+            const rel = getEnvSeconds(t.env.r, 'r');
+            const now = sys.ctx.currentTime;
+            
+            // Trigger release phase
+            voice.gain.gain.cancelScheduledValues(now);
+            voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+            voice.gain.gain.setTargetAtTime(0, now, rel/3);
+            
+            voice.src.stop(now + (rel*6));
+            delete sys.midiVoices[note];
+        }
+
+        // --- SCHEDULER ---
+        function scheduler() {
+            const lookahead = 0.1;
+            while(sys.nextTime < sys.ctx.currentTime + lookahead) {
+                const currentStep = sys.step;
+                requestAnimationFrame(() => {
+                    sys.tracks.forEach(t => {
+                        const grid = document.getElementById('grid-'+t.id).children;
+                        for(let i=0; i<16; i++) grid[i].classList.remove('playing');
+                        grid[currentStep].classList.add('playing');
+                    });
+                });
+                sys.tracks.forEach((t, idx) => {
+                    const s = t.grid[currentStep];
+                    if(s.active) triggerNote(idx, s.note + t.transpose + parseInt(sys.globalTranspose), sys.nextTime);
+                });
+                sys.nextTime += (60.0 / sys.bpm) * 0.25;
+                sys.step = (sys.step + 1) % 16;
+            }
+            if(sys.playing) sys.timer = setTimeout(scheduler, 25);
+        }
+
+        // --- INIT ---
+        createTrack(0);
+
+        ui.init.onclick = async () => {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            sys.ctx = new AC();
+            const b = sys.ctx.createBuffer(1,1,22050);
+            const s = sys.ctx.createBufferSource();
+            s.buffer = b; s.connect(sys.ctx.destination); s.start(0);
+            if(sys.ctx.state==='suspended') await sys.ctx.resume();
+
+            sys.mainGain = sys.ctx.createGain();
+            sys.mainGain.gain.value = 0.5;
+            sys.analyser = sys.ctx.createAnalyser();
+            sys.analyser.fftSize = 256;
+            sys.mainGain.connect(sys.analyser);
+            sys.analyser.connect(sys.ctx.destination);
+
+            sys.ready = true;
+            ui.init.style.display='none';
+            ui.ctrls.style.display='flex';
+            drawScope();
+        };
+
+        ui.play.onclick = () => {
+            if(sys.playing) return;
+            sys.playing = true; sys.step=0; sys.nextTime=sys.ctx.currentTime+0.05;
+            ui.play.classList.add('active'); scheduler();
+        };
+        ui.stop.onclick = () => {
+            sys.playing = false; clearTimeout(sys.timer);
+            ui.play.classList.remove('active');
+            document.querySelectorAll('.step-pad').forEach(e => e.classList.remove('playing'));
+        };
+        ui.bpm.oninput = (e) => { sys.bpm = parseInt(e.target.value); ui.bpmDisp.innerText = sys.bpm; };
+        ui.key.onchange = (e) => { sys.root=e.target.value; refreshAllGrids(); };
+        ui.scale.onchange = (e) => { sys.scale=e.target.value; refreshAllGrids(); };
+        ui.gShift.oninput = (e) => { 
+            sys.globalTranspose = parseInt(e.target.value); 
+            ui.gShiftDisp.innerText = sys.globalTranspose;
+            refreshAllGrids();
+        };
+
+        function refreshAllGrids() {
+            sys.tracks.forEach(t => renderGrid(t.id));
+        }
+
+        let pThrottle = 0;
+
+        document.body.addEventListener('input', (e) => {
+            const el = e.target;
+            const tid = parseInt(el.dataset.track);
+            
+            if(el.classList.contains('mini-vol')) {
+                sys.tracks[tid].gain = parseInt(el.value) / 100;
+            }
+            if(el.dataset.param) {
+                sys.tracks[tid].env[el.dataset.param] = parseInt(el.value);
+            }
+            if(el.classList.contains('pitch-slider')) {
+                const val = parseInt(el.value);
+                const t = sys.tracks[tid];
+                t.grid[t.sel].note = val;
+                updatePitchLCD(tid, val);
+                renderGrid(tid);
+                const now = Date.now();
+                if(now - pThrottle > 100) {
+                    const eff = val + t.transpose + parseInt(sys.globalTranspose);
+                    triggerNote(tid, eff, sys.ctx.currentTime, 0.15);
+                    pThrottle = now;
+                }
+            }
+            if(el.classList.contains('trans-slider')) {
+                sys.tracks[tid].transpose = parseInt(el.value);
+                renderGrid(tid);
+            }
+        });
+
+        document.body.addEventListener('click', (e) => {
+            const el = e.target;
+            
+            if(el.classList.contains('btn-min')) {
+                const tid = parseInt(el.dataset.track);
+                const body = document.getElementById('tbody-'+tid);
+                sys.tracks[tid].minimized = !sys.tracks[tid].minimized;
+                body.style.display = sys.tracks[tid].minimized ? 'none' : 'block';
+                el.innerText = sys.tracks[tid].minimized ? '+' : '-';
+            }
+
+            if(el.classList.contains('wave-btn')) {
+                const tid = parseInt(el.dataset.track);
+                const t = sys.tracks[tid];
+                t.mode = 'synth'; t.wave = el.dataset.type;
+                updateTrackStatus(tid);
+                document.querySelectorAll(`.wave-btn[data-track="${tid}"]`).forEach(b => b.classList.remove('active'));
+                el.classList.add('active');
+            }
+            if(el.classList.contains('rnd-btn')) {
+                const tid = parseInt(el.dataset.track);
+                const base = tid===0?60:(tid===1?36:48);
+                sys.tracks[tid].grid.forEach(s => {
+                    s.active = Math.random()>0.6;
+                    if(s.active) {
+                        const raw = base + Math.floor(Math.random()*24)-12;
+                        s.note = snapToScale(raw);
+                    }
+                });
+                renderGrid(tid);
+            }
+            if(el.classList.contains('clr-btn')) {
+                const tid = parseInt(el.dataset.track);
+                sys.tracks[tid].grid.forEach(s => s.active=false);
+                renderGrid(tid);
+            }
+        });
+
+        document.body.addEventListener('change', (e) => {
+            if(e.target.classList.contains('preset-select')) {
+                const tid = parseInt(e.target.dataset.track);
+                sys.tracks[tid].mode = 'sampler';
+                sys.tracks[tid].sampleIdx = parseInt(e.target.value);
+                updateTrackStatus(tid);
+                document.querySelectorAll(`.wave-btn[data-track="${tid}"]`).forEach(b => b.classList.remove('active'));
+            }
+        });
+
+        ui.sf2Input.onchange = (e) => {
+            const f = e.target.files[0];
+            if(!f) return;
+            ui.globalLcd.innerText = "PARSING...";
+            const r = new FileReader();
+            r.onload = (evt) => {
+                const dv = new DataView(evt.target.result);
+                sys.sf2 = evt.target.result;
+                sys.sdta = parseSF2(dv);
+                const selects = document.querySelectorAll('.preset-select');
+                selects.forEach(sel => {
+                    sel.innerHTML = "";
+                    sys.samples.forEach((s,i) => {
+                        const o = document.createElement('option');
+                        o.value = i; o.innerText = s.name;
+                        sel.appendChild(o);
+                    });
+                    sel.disabled = false;
+                });
+                ui.globalLcd.innerText = f.name.substring(0,8).toUpperCase();
+            };
+            r.readAsArrayBuffer(f);
+        };
+
+        function parseSF2(dv) {
+            const str = (o,l) => {let s='';for(let i=0;i<l;i++)s+=String.fromCharCode(dv.getUint8(o+i));return s;};
+            let off=12, shdr=0, size=0, sdta=0;
+            while(off < dv.byteLength-8) {
+                const id=str(off,4), sz=dv.getUint32(off+4,true);
+                if(id==='LIST') {
+                    const type=str(off+8,4);
+                    if(type==='sdta') sdta=off+20;
+                    if(type==='pdta') {
+                        let s=off+12, e=off+8+sz;
+                        while(s<e) {
+                            if(str(s,4)==='shdr') { shdr=s+8; size=dv.getUint32(s+4,true); break; }
+                            s+=8+dv.getUint32(s+4,true);
+                        }
+                    }
+                }
+                off+=8+sz;
+            }
+            if(shdr) {
+                sys.samples=[];
+                const num = size/46;
+                for(let i=0; i<num; i++) {
+                    const b=shdr+(i*46);
+                    let nm=""; for(let j=0;j<20;j++){let c=dv.getUint8(b+j);if(c===0)break;nm+=String.fromCharCode(c);}
+                    if(nm!=="EOS") sys.samples.push({
+                        name:nm, start:dv.getUint32(b+20,true), end:dv.getUint32(b+24,true),
+                        rate:dv.getUint32(b+36,true), root:dv.getUint8(b+40)
+                    });
+                }
+            }
+            return sdta;
+        }
+
+        function populateSelect(tid) {
+            const sel = document.querySelector(`.preset-select[data-track="${tid}"]`);
+            sel.innerHTML = "";
+            sys.samples.forEach((s,i) => {
+                const o = document.createElement('option');
+                o.value = i; o.innerText = s.name;
+                sel.appendChild(o);
+            });
+            sel.disabled = false;
+        }
+
+        function drawScope() {
+            requestAnimationFrame(drawScope);
+            if(!sys.ready) return;
+            const ctx = ui.canvas.getContext('2d');
+            const w=ui.canvas.width, h=ui.canvas.height;
+            const d = new Uint8Array(sys.analyser.frequencyBinCount);
+            sys.analyser.getByteTimeDomainData(d);
+            ctx.fillStyle='#000'; ctx.fillRect(0,0,w,h);
+            ctx.lineWidth = 2; ctx.strokeStyle='#39ff14'; ctx.beginPath();
+            let x=0, sl=w/d.length;
+            for(let i=0; i<d.length; i++) {
+                let v = d[i]/128.0; let y = v*h/2;
+                if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+                x+=sl;
+            }
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
