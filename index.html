@@ -125,13 +125,13 @@
         .workspace {
             flex: 1;
             padding: 10px;
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 1fr;
             gap: 15px;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             background: #888;
-            padding-bottom: 120px; 
+            padding-bottom: 120px;
         }
 
         .track-section {
@@ -254,9 +254,9 @@
         }
         .tiny-btn.active { background: #999; border: 1px inset; color: white; }
 
-        .add-track-area { 
-            padding: 20px; 
-            text-align: center; 
+        .add-track-area {
+            padding: 20px;
+            text-align: center;
             margin-top: 10px;
         }
         .btn-add {
@@ -265,9 +265,78 @@
         }
         .btn-add:active { background: #ccc; }
 
+        /* --- MIDI PANEL --- */
+        .midi-panel {
+            display: none;
+            background: #a0a0a0;
+            border-bottom: 2px solid var(--win-darker);
+            padding: 8px;
+            z-index: 45;
+        }
+        .midi-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .midi-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #111;
+        }
+        .midi-notes {
+            font-family: monospace;
+            font-size: 12px;
+            background: #fff;
+            padding: 2px 6px;
+            border: 1px inset #777;
+            border-radius: 2px;
+            min-height: 20px;
+            flex: 1;
+            text-align: right;
+            color: #000;
+        }
+        .piano {
+            margin-top: 6px;
+            background: #777;
+            padding: 6px;
+            border: 1px inset #555;
+            display: grid;
+            gap: 3px;
+            height: 90px;
+        }
+        .piano-key {
+            border-radius: 2px;
+            border: 1px solid #111;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #000;
+            background: linear-gradient(180deg, #fdfdfd, #ddd);
+        }
+        .piano-key.black {
+            background: linear-gradient(180deg, #333, #111);
+            color: #fff;
+        }
+        .piano-key.active {
+            outline: 2px solid #39ff14;
+            box-shadow: 0 0 8px #39ff14;
+        }
+
         select { font-size: 11px; padding: 2px; height: 24px; border: 1px inset; }
 
         .track-body.collapsed { display: none; }
+
+        @media (min-width: 900px) {
+            .workspace {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                align-items: start;
+            }
+            .add-track-area { grid-column: 1 / -1; }
+        }
 
     </style>
 </head>
@@ -319,6 +388,16 @@
             <canvas id="scope"></canvas>
         </div>
 
+        <!-- MIDI PANEL -->
+        <div class="midi-panel" id="midi-panel">
+            <div class="midi-row">
+                <span class="midi-label">MIDI</span>
+                <div id="midi-device" class="midi-notes" style="text-align:left;">No device detected</div>
+                <div id="midi-active" class="midi-notes">---</div>
+            </div>
+            <div class="piano" id="midi-piano"></div>
+        </div>
+
         <!-- WORKSPACE -->
         <div class="workspace" id="track-container">
             <!-- Dynamic Tracks -->
@@ -346,7 +425,8 @@
             root: 0, scale: 'major', globalTranspose: 0,
             sf2: null, sdta: 0, samples: [],
             tracks: [],
-            midiVoices: {} // Track active MIDI notes: key=note, val={src, gain, trackId}
+            midiVoices: {}, // Track active MIDI notes: key=note, val={src, gain, trackId, snapped}
+            activeMidiNotes: new Set()
         };
 
         const ui = {
@@ -365,17 +445,33 @@
             gShiftDisp: document.getElementById('shift-disp'),
             globalLcd: document.getElementById('global-lcd'),
             sf2Input: document.getElementById('sf2-input'),
-            canvas: document.getElementById('scope')
+            canvas: document.getElementById('scope'),
+            midiPanel: document.getElementById('midi-panel'),
+            midiDevice: document.getElementById('midi-device'),
+            midiActive: document.getElementById('midi-active'),
+            midiPiano: document.getElementById('midi-piano')
         };
+
+        ui.globalLcd.dataset.fileLabel = ui.globalLcd.innerText;
+
+        const midiKeys = {};
+        const PIANO_START = 48; // C3
+        const PIANO_END = 84;   // B5
 
         // --- MIDI SETUP ---
         if (navigator.requestMIDIAccess) {
             navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
         }
         function onMIDISuccess(midiAccess) {
+            sys.midiReady = true;
+            ui.midiPanel.style.display = 'block';
+            const devices = [];
             for (let input of midiAccess.inputs.values()) {
                 input.onmidimessage = getMIDIMessage;
+                devices.push(input.name || 'MIDI Input');
             }
+            ui.midiDevice.innerText = devices.length ? devices.join(', ') : 'MIDI ready (no input detected)';
+            buildMidiPiano();
         }
         function onMIDIFailure() { console.warn("MIDI not supported"); }
         function getMIDIMessage(msg) {
@@ -385,6 +481,44 @@
             const vel = (msg.data.length > 2) ? msg.data[2] : 0;
             if (cmd === 144 && vel > 0) midiNoteOn(note); // Note On
             if (cmd === 128 || (cmd === 144 && vel === 0)) midiNoteOff(note); // Note Off
+        }
+
+        function buildMidiPiano() {
+            if(ui.midiPiano.childElementCount > 0) return;
+            const count = PIANO_END - PIANO_START + 1;
+            ui.midiPiano.style.gridTemplateColumns = `repeat(${count}, 1fr)`;
+            for(let n = PIANO_START; n <= PIANO_END; n++) {
+                const key = document.createElement('div');
+                const isBlack = [1,3,6,8,10].includes(n % 12);
+                key.className = 'piano-key' + (isBlack ? ' black' : '');
+                if(NOTES[n % 12] === 'C') key.innerText = `C${Math.floor(n/12)-1}`;
+                key.dataset.note = n;
+                midiKeys[n] = key;
+                ui.midiPiano.appendChild(key);
+            }
+        }
+
+        function midiNoteLabel(n) {
+            const name = NOTES[n % 12];
+            const oct = Math.floor(n / 12) - 1;
+            return name + oct;
+        }
+
+        function refreshMidiReadout() {
+            const active = Array.from(sys.activeMidiNotes).sort((a,b) => a-b);
+            const text = active.length ? active.map(midiNoteLabel).join(' ') : '---';
+            ui.midiActive.innerText = text;
+            if(active.length) {
+                ui.globalLcd.innerText = `MIDI: ${text}`;
+            } else {
+                ui.globalLcd.innerText = ui.globalLcd.dataset.fileLabel || 'EMPTY';
+            }
+        }
+
+        function setPianoState(note, on) {
+            const key = midiKeys[note];
+            if(!key) return;
+            if(on) key.classList.add('active'); else key.classList.remove('active');
         }
 
         // --- TRACK MANAGEMENT ---
@@ -646,12 +780,15 @@
             // Map to Track 0 settings (ID 0)
             if(sys.midiVoices[note]) return; // Already playing
             const tIdx = 0;
-            // No scale snap for MIDI typically, but lets follow Track 0 sound
-            const voice = playSound(tIdx, note, sys.ctx.currentTime, 0, true);
-            if(voice) sys.midiVoices[note] = voice;
-            
-            // Visual feedback on Global LCD
-            ui.globalLcd.innerText = "MIDI: " + note;
+            const t = sys.tracks[tIdx];
+            const effNote = snapToScale(note + t.transpose + parseInt(sys.globalTranspose));
+            const voice = playSound(tIdx, effNote, sys.ctx.currentTime, 0, true);
+            if(voice) {
+                sys.midiVoices[note] = { ...voice, snapped: effNote };
+                sys.activeMidiNotes.add(effNote);
+                setPianoState(effNote, true);
+                refreshMidiReadout();
+            }
         }
 
         function midiNoteOff(note) {
@@ -665,9 +802,15 @@
             voice.gain.gain.cancelScheduledValues(now);
             voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
             voice.gain.gain.setTargetAtTime(0, now, rel/3);
-            
+
             voice.src.stop(now + (rel*6));
             delete sys.midiVoices[note];
+
+            if(voice.snapped !== undefined) {
+                sys.activeMidiNotes.delete(voice.snapped);
+                setPianoState(voice.snapped, false);
+                refreshMidiReadout();
+            }
         }
 
         // --- SCHEDULER ---
@@ -837,7 +980,9 @@
                     });
                     sel.disabled = false;
                 });
-                ui.globalLcd.innerText = f.name.substring(0,8).toUpperCase();
+                const label = f.name.substring(0,8).toUpperCase();
+                ui.globalLcd.innerText = label;
+                ui.globalLcd.dataset.fileLabel = label;
             };
             r.readAsArrayBuffer(f);
         };
