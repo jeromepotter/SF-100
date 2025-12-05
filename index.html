@@ -196,66 +196,43 @@
 
         /* --- SLIDERS --- */
         input[type=range] {
-            -webkit-appearance: none; background: linear-gradient(to right, #4fa86b 0%, #4fa86b var(--fill, 50%), #1f1f1f var(--fill, 50%), #1f1f1f 100%);
-            touch-action: pan-x pan-y;
-            min-height: 32px;
-            padding: 8px 0;
-            border-radius: 12px;
-            border: 1px solid #1a1a1a;
+            -webkit-appearance: none; background: transparent;
+            touch-action: none;
         }
         input[type=range]:focus { outline: none; }
 
         .adsr-container {
-            display: flex; justify-content: space-between; height: 130px;
-            background: linear-gradient(180deg, #d5d5d5, #b3b3b3);
-            border: 1px inset; padding: 6px; border-radius: 6px;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.25);
+            display: flex; justify-content: space-between; height: 80px;
+            background: #bbb; border: 1px inset; padding: 4px;
         }
         .fader-group { display: flex; flex-direction: column; align-items: center; flex: 1; }
-        .fader-label { font-size: 9px; font-weight: bold; color: #111; margin-top: 6px; letter-spacing: 0.5px; }
+        .fader-label { font-size: 8px; font-weight: bold; color: #222; margin-top: 2px; }
 
         input[type=range].vertical {
-            -webkit-appearance: none; width: 48px; height: 100%; cursor: pointer;
-            background: linear-gradient(to top, #1d1d1d, #2c2c2c);
-            border-radius: 14px; border: 1px solid #111; padding: 10px 14px;
-        }
-        input[type=range].vertical::-webkit-slider-runnable-track {
-            width: 12px; height: 100%; background: transparent;
-        }
-        input[type=range].vertical::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 22px; height: 22px; border-radius: 8px;
-            background: linear-gradient(180deg, #fff, #c8c8c8);
-            border: 1px solid #555; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-            margin-left: -5px;
-        }
-
-        input[type=range].vertical::-moz-range-track { background: transparent; border: none; }
-        input[type=range].vertical::-moz-range-thumb {
-            width: 22px; height: 22px; border-radius: 8px; border: 1px solid #555; background: linear-gradient(180deg, #fff, #c8c8c8);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            -webkit-appearance: slider-vertical; width: 30px; height: 100%; cursor: pointer;
         }
 
         input[type=range].horiz {
-            width: 100%; height: 36px; margin: 0; border-radius: 10px;
+            width: 100%; height: 30px; margin: 0;
         }
         input[type=range].horiz::-webkit-slider-runnable-track {
-            height: 10px; background: #222; border: 1px inset; border-radius: 5px;
+            height: 8px; background: #222; border: 1px inset; border-radius: 4px;
         }
         input[type=range].horiz::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 28px; height: 28px;
+            -webkit-appearance: none; width: 22px; height: 22px;
             background: #ccc; border: 2px outset #eee;
-            margin-top: -10px; border-radius: 6px;
+            margin-top: -8px; border-radius: 2px;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
         }
-        
+
         input[type=range].mini-vol {
-            width: 72px; height: 28px;
+            width: 60px; height: 20px;
         }
         input[type=range].mini-vol::-webkit-slider-runnable-track {
-            height: 10px; background: #999; border: 1px solid #555; border-radius: 6px;
+            height: 4px; background: #999; border: 1px solid #555;
         }
         input[type=range].mini-vol::-webkit-slider-thumb {
-            width: 20px; height: 20px; margin-top: -6px; background: #fff; border: 1px solid #000; border-radius: 50%;
+            width: 12px; height: 12px; margin-top: -5px; background: #fff; border: 1px solid #000;
         }
 
         /* --- GRID --- */
@@ -606,13 +583,8 @@
         }
 
         function paintRange(el) {
-            const min = parseFloat(el.min || 0);
-            const max = parseFloat(el.max || 100);
-            const val = parseFloat(el.value || 0);
-            const pct = ((val - min) / (max - min)) * 100;
-            const dir = el.classList.contains('vertical') ? 'to top' : 'to right';
-            el.style.setProperty('--fill', `${pct}%`);
-            el.style.background = `linear-gradient(${dir}, #4fa86b 0%, #4fa86b ${pct}%, #1f1f1f ${pct}%, #1f1f1f 100%)`;
+            // Preserve default styling while ensuring any previous inline gradients are cleared
+            el.style.background = 'transparent';
         }
 
         function paintAllRanges() {
