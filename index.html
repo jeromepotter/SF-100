@@ -47,6 +47,15 @@
             position: relative;
         }
 
+        @media (min-width: 900px) {
+            body { justify-content: center; }
+            .device-case {
+                max-width: none;
+                width: calc(100% - 40px);
+                margin: 0 20px;
+            }
+        }
+
         /* --- HEADER --- */
         .transport-bar {
             background: var(--win-gray);
@@ -116,13 +125,13 @@
         .workspace {
             flex: 1;
             padding: 10px;
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 1fr;
             gap: 15px;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             background: #888;
-            padding-bottom: 120px; 
+            padding-bottom: 120px;
         }
 
         .track-section {
@@ -133,6 +142,9 @@
             box-shadow: 3px 3px 8px rgba(0,0,0,0.4);
             animation: slideIn 0.3s ease-out;
             transition: all 0.2s ease;
+        }
+        .track-section.active-track {
+            box-shadow: 0 0 0 2px #fff, 0 0 10px #ff0;
         }
         @keyframes slideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
 
@@ -181,7 +193,9 @@
         /* --- SLIDERS --- */
         input[type=range] {
             -webkit-appearance: none; background: transparent;
-            touch-action: none; 
+            touch-action: pan-x pan-y;
+            min-height: 32px;
+            padding: 8px 0;
         }
         input[type=range]:focus { outline: none; }
 
@@ -193,30 +207,30 @@
         .fader-label { font-size: 8px; font-weight: bold; color: #222; margin-top: 2px; }
         
         input[type=range].vertical {
-            -webkit-appearance: slider-vertical; width: 30px; height: 100%; cursor: pointer;
+            -webkit-appearance: slider-vertical; width: 36px; height: 100%; cursor: pointer;
         }
 
         input[type=range].horiz {
-            width: 100%; height: 30px; margin: 0;
+            width: 100%; height: 36px; margin: 0;
         }
         input[type=range].horiz::-webkit-slider-runnable-track {
-            height: 8px; background: #222; border: 1px inset; border-radius: 4px;
+            height: 10px; background: #222; border: 1px inset; border-radius: 5px;
         }
         input[type=range].horiz::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 22px; height: 22px; 
-            background: #ccc; border: 2px outset #eee; 
-            margin-top: -8px; border-radius: 2px;
+            -webkit-appearance: none; width: 28px; height: 28px;
+            background: #ccc; border: 2px outset #eee;
+            margin-top: -10px; border-radius: 6px;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
         }
         
         input[type=range].mini-vol {
-            width: 60px; height: 20px;
+            width: 72px; height: 28px;
         }
         input[type=range].mini-vol::-webkit-slider-runnable-track {
-            height: 4px; background: #999; border: 1px solid #555;
+            height: 10px; background: #999; border: 1px solid #555; border-radius: 6px;
         }
         input[type=range].mini-vol::-webkit-slider-thumb {
-            width: 12px; height: 12px; margin-top: -5px; background: #fff; border: 1px solid #000;
+            width: 20px; height: 20px; margin-top: -6px; background: #fff; border: 1px solid #000; border-radius: 50%;
         }
 
         /* --- GRID --- */
@@ -245,9 +259,9 @@
         }
         .tiny-btn.active { background: #999; border: 1px inset; color: white; }
 
-        .add-track-area { 
-            padding: 20px; 
-            text-align: center; 
+        .add-track-area {
+            padding: 20px;
+            text-align: center;
             margin-top: 10px;
         }
         .btn-add {
@@ -256,9 +270,78 @@
         }
         .btn-add:active { background: #ccc; }
 
+        /* --- MIDI PANEL --- */
+        .midi-panel {
+            display: none;
+            background: #a0a0a0;
+            border-bottom: 2px solid var(--win-darker);
+            padding: 8px;
+            z-index: 45;
+        }
+        .midi-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .midi-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #111;
+        }
+        .midi-notes {
+            font-family: monospace;
+            font-size: 12px;
+            background: #fff;
+            padding: 2px 6px;
+            border: 1px inset #777;
+            border-radius: 2px;
+            min-height: 20px;
+            flex: 1;
+            text-align: right;
+            color: #000;
+        }
+        .piano {
+            margin-top: 6px;
+            background: #777;
+            padding: 6px;
+            border: 1px inset #555;
+            display: grid;
+            gap: 3px;
+            height: 90px;
+        }
+        .piano-key {
+            border-radius: 2px;
+            border: 1px solid #111;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #000;
+            background: linear-gradient(180deg, #fdfdfd, #ddd);
+        }
+        .piano-key.black {
+            background: linear-gradient(180deg, #333, #111);
+            color: #fff;
+        }
+        .piano-key.active {
+            outline: 2px solid #39ff14;
+            box-shadow: 0 0 8px #39ff14;
+        }
+
         select { font-size: 11px; padding: 2px; height: 24px; border: 1px inset; }
 
         .track-body.collapsed { display: none; }
+
+        @media (min-width: 900px) {
+            .workspace {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                align-items: start;
+            }
+            .add-track-area { grid-column: 1 / -1; }
+        }
 
     </style>
 </head>
@@ -310,6 +393,16 @@
             <canvas id="scope"></canvas>
         </div>
 
+        <!-- MIDI PANEL -->
+        <div class="midi-panel" id="midi-panel">
+            <div class="midi-row">
+                <span class="midi-label">MIDI</span>
+                <div id="midi-device" class="midi-notes" style="text-align:left;">No device detected</div>
+                <div id="midi-active" class="midi-notes">---</div>
+            </div>
+            <div class="piano" id="midi-piano"></div>
+        </div>
+
         <!-- WORKSPACE -->
         <div class="workspace" id="track-container">
             <!-- Dynamic Tracks -->
@@ -337,7 +430,9 @@
             root: 0, scale: 'major', globalTranspose: 0,
             sf2: null, sdta: 0, samples: [],
             tracks: [],
-            midiVoices: {} // Track active MIDI notes: key=note, val={src, gain, trackId}
+            activeTrack: 0,
+            midiVoices: {}, // Track active MIDI notes: key=note, val={src, gain, trackId, snapped}
+            activeMidiNotes: new Set()
         };
 
         const ui = {
@@ -356,17 +451,33 @@
             gShiftDisp: document.getElementById('shift-disp'),
             globalLcd: document.getElementById('global-lcd'),
             sf2Input: document.getElementById('sf2-input'),
-            canvas: document.getElementById('scope')
+            canvas: document.getElementById('scope'),
+            midiPanel: document.getElementById('midi-panel'),
+            midiDevice: document.getElementById('midi-device'),
+            midiActive: document.getElementById('midi-active'),
+            midiPiano: document.getElementById('midi-piano')
         };
+
+        ui.globalLcd.dataset.fileLabel = ui.globalLcd.innerText;
+
+        const midiKeys = {};
+        const PIANO_START = 48; // C3
+        const PIANO_END = 84;   // B5
 
         // --- MIDI SETUP ---
         if (navigator.requestMIDIAccess) {
             navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
         }
         function onMIDISuccess(midiAccess) {
+            sys.midiReady = true;
+            ui.midiPanel.style.display = 'block';
+            const devices = [];
             for (let input of midiAccess.inputs.values()) {
                 input.onmidimessage = getMIDIMessage;
+                devices.push(input.name || 'MIDI Input');
             }
+            ui.midiDevice.innerText = devices.length ? devices.join(', ') : 'MIDI ready (no input detected)';
+            buildMidiPiano();
         }
         function onMIDIFailure() { console.warn("MIDI not supported"); }
         function getMIDIMessage(msg) {
@@ -376,6 +487,44 @@
             const vel = (msg.data.length > 2) ? msg.data[2] : 0;
             if (cmd === 144 && vel > 0) midiNoteOn(note); // Note On
             if (cmd === 128 || (cmd === 144 && vel === 0)) midiNoteOff(note); // Note Off
+        }
+
+        function buildMidiPiano() {
+            if(ui.midiPiano.childElementCount > 0) return;
+            const count = PIANO_END - PIANO_START + 1;
+            ui.midiPiano.style.gridTemplateColumns = `repeat(${count}, 1fr)`;
+            for(let n = PIANO_START; n <= PIANO_END; n++) {
+                const key = document.createElement('div');
+                const isBlack = [1,3,6,8,10].includes(n % 12);
+                key.className = 'piano-key' + (isBlack ? ' black' : '');
+                if(NOTES[n % 12] === 'C') key.innerText = `C${Math.floor(n/12)-1}`;
+                key.dataset.note = n;
+                midiKeys[n] = key;
+                ui.midiPiano.appendChild(key);
+            }
+        }
+
+        function midiNoteLabel(n) {
+            const name = NOTES[n % 12];
+            const oct = Math.floor(n / 12) - 1;
+            return name + oct;
+        }
+
+        function refreshMidiReadout() {
+            const active = Array.from(sys.activeMidiNotes).sort((a,b) => a-b);
+            const text = active.length ? active.map(midiNoteLabel).join(' ') : '---';
+            ui.midiActive.innerText = text;
+            if(active.length) {
+                ui.globalLcd.innerText = `MIDI: ${text}`;
+            } else {
+                ui.globalLcd.innerText = ui.globalLcd.dataset.fileLabel || 'EMPTY';
+            }
+        }
+
+        function setPianoState(note, on) {
+            const key = midiKeys[note];
+            if(!key) return;
+            if(on) key.classList.add('active'); else key.classList.remove('active');
         }
 
         // --- TRACK MANAGEMENT ---
@@ -400,6 +549,7 @@
             renderTrackHTML(id);
             renderGrid(id);
             updateTrackStatus(id);
+            if(sys.tracks.length === 1) setActiveTrack(0);
         }
 
         function renderTrackHTML(id) {
@@ -498,11 +648,12 @@
                 const transposed = base + t.transpose + parseInt(sys.globalTranspose);
                 const snapped = snapToScale(transposed);
                 const noteName = NOTES[snapped % 12];
-                
+
                 el.innerHTML = `<span style="font-size:9px; position:absolute; top:2px; left:2px; opacity:0.5;">${sIdx+1}</span>
                                 <span style="font-size:10px; font-weight:bold; position:absolute; bottom:2px; right:2px; color:white;">${step.active?noteName:''}</span>`;
-                
+
                 el.onclick = () => {
+                    setActiveTrack(id);
                     if(t.sel !== sIdx) t.sel = sIdx;
                     else step.active = !step.active;
                     
@@ -513,6 +664,14 @@
                 };
                 div.appendChild(el);
             });
+        }
+
+        function setActiveTrack(id) {
+            if(!sys.tracks[id]) return;
+            sys.activeTrack = id;
+            document.querySelectorAll('.track-section').forEach(sec => sec.classList.remove('active-track'));
+            const sec = document.getElementById('track-sec-'+id);
+            if(sec) sec.classList.add('active-track');
         }
 
         function updatePitchLCD(id, note) {
@@ -539,6 +698,30 @@
             return 0;
         }
 
+        function buildSampleBuffer(sample) {
+            if (sample.buffer) return sample.buffer;
+            const len = sample.end - sample.start;
+            if (len <= 0 || !sys.ctx) return null;
+
+            // Pad the buffer with a short sustain tail so envelopes can fade naturally
+            const pad = Math.floor(sample.rate * 2);
+            const buffer = sys.ctx.createBuffer(1, len + pad, sample.rate);
+            const channel = buffer.getChannelData(0);
+            const dv = new DataView(sys.sf2);
+            const off = sys.sdta + (sample.start * 2);
+
+            for (let i = 0; i < len; i++) {
+                if (off + (i * 2) < sys.sf2.byteLength) channel[i] = dv.getInt16(off + (i * 2), true) / 32768.0;
+            }
+
+            // Hold the final value through the padded tail to avoid abrupt drops
+            const last = channel[len - 1] || 0;
+            for (let i = len; i < len + pad; i++) channel[i] = last;
+
+            sample.buffer = buffer;
+            return buffer;
+        }
+
         function playSound(tIdx, note, time, gateDuration, isMidi) {
             const t = sys.tracks[tIdx];
             const freq = 440 * Math.pow(2, (note-69)/12);
@@ -556,19 +739,27 @@
             } else if (t.mode === 'sampler') {
                 const s = sys.samples[t.sampleIdx];
                 if(!s) return null;
-                const len = s.end - s.start;
-                if(len<=0) return null;
-                const b = sys.ctx.createBuffer(1, len, s.rate);
-                const d = b.getChannelData(0);
-                const dv = new DataView(sys.sf2);
-                const off = sys.sdta + (s.start*2);
-                for(let i=0; i<len; i++) {
-                    if(off+(i*2) < sys.sf2.byteLength) d[i] = dv.getInt16(off+(i*2), true)/32768.0;
-                }
+                const buffer = buildSampleBuffer(s);
+                if(!buffer) return null;
                 src = sys.ctx.createBufferSource();
-                src.buffer = b;
+                src.buffer = buffer;
                 const root = s.root||60;
                 src.playbackRate.value = Math.pow(2, (note-root)/12);
+
+                // Apply loop points when present to sustain SoundFont envelopes naturally
+                const hasLoop = s.loopEnd > s.loopStart && s.loopEnd <= s.end;
+                if(hasLoop) {
+                    src.loop = true;
+                    const loopStartSec = (s.loopStart - s.start) / s.rate;
+                    const loopEndSec = (s.loopEnd - s.start) / s.rate;
+                    src.loopStart = Math.max(0, loopStartSec);
+                    src.loopEnd = Math.max(src.loopStart + 0.001, loopEndSec);
+                } else if (gateDuration <= 0) {
+                    // Allow held MIDI notes to sustain even when a SoundFont lacks loop metadata
+                    src.loop = true;
+                    src.loopStart = 0;
+                    src.loopEnd = buffer.duration;
+                }
             }
 
             const gain = sys.ctx.createGain();
@@ -604,19 +795,23 @@
         function midiNoteOn(note) {
             // Map to Track 0 settings (ID 0)
             if(sys.midiVoices[note]) return; // Already playing
-            const tIdx = 0;
-            // No scale snap for MIDI typically, but lets follow Track 0 sound
-            const voice = playSound(tIdx, note, sys.ctx.currentTime, 0, true);
-            if(voice) sys.midiVoices[note] = voice;
-            
-            // Visual feedback on Global LCD
-            ui.globalLcd.innerText = "MIDI: " + note;
+            const tIdx = sys.tracks[sys.activeTrack] ? sys.activeTrack : 0;
+            const t = sys.tracks[tIdx];
+            if(!t) return;
+            const effNote = snapToScale(note + t.transpose + parseInt(sys.globalTranspose));
+            const voice = playSound(tIdx, effNote, sys.ctx.currentTime, 0, true);
+            if(voice) {
+                sys.midiVoices[note] = { ...voice, snapped: effNote, trackId: tIdx };
+                sys.activeMidiNotes.add(effNote);
+                setPianoState(effNote, true);
+                refreshMidiReadout();
+            }
         }
 
         function midiNoteOff(note) {
             const voice = sys.midiVoices[note];
             if(!voice) return;
-            const t = sys.tracks[0];
+            const t = sys.tracks[voice.trackId ?? 0] || sys.tracks[0];
             const rel = getEnvSeconds(t.env.r, 'r');
             const now = sys.ctx.currentTime;
             
@@ -624,9 +819,15 @@
             voice.gain.gain.cancelScheduledValues(now);
             voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
             voice.gain.gain.setTargetAtTime(0, now, rel/3);
-            
+
             voice.src.stop(now + (rel*6));
             delete sys.midiVoices[note];
+
+            if(voice.snapped !== undefined) {
+                sys.activeMidiNotes.delete(voice.snapped);
+                setPianoState(voice.snapped, false);
+                refreshMidiReadout();
+            }
         }
 
         // --- SCHEDULER ---
@@ -699,39 +900,54 @@
         }
 
         let pThrottle = 0;
+        let sliderFrame = null;
+        const pendingSliders = new Map();
+
+        function applySliderChanges() {
+            pendingSliders.forEach((val, el) => {
+                const tid = parseInt(el.dataset.track);
+
+                if(el.classList.contains('mini-vol')) {
+                    sys.tracks[tid].gain = val / 100;
+                }
+                if(el.dataset.param) {
+                    sys.tracks[tid].env[el.dataset.param] = val;
+                }
+                if(el.classList.contains('pitch-slider')) {
+                    const t = sys.tracks[tid];
+                    t.grid[t.sel].note = val;
+                    updatePitchLCD(tid, val);
+                    renderGrid(tid);
+                    const now = Date.now();
+                    if(now - pThrottle > 100) {
+                        const eff = val + t.transpose + parseInt(sys.globalTranspose);
+                        triggerNote(tid, eff, sys.ctx.currentTime, 0.15);
+                        pThrottle = now;
+                    }
+                }
+                if(el.classList.contains('trans-slider')) {
+                    sys.tracks[tid].transpose = val;
+                    renderGrid(tid);
+                }
+            });
+
+            pendingSliders.clear();
+            sliderFrame = null;
+        }
 
         document.body.addEventListener('input', (e) => {
             const el = e.target;
-            const tid = parseInt(el.dataset.track);
-            
-            if(el.classList.contains('mini-vol')) {
-                sys.tracks[tid].gain = parseInt(el.value) / 100;
-            }
-            if(el.dataset.param) {
-                sys.tracks[tid].env[el.dataset.param] = parseInt(el.value);
-            }
-            if(el.classList.contains('pitch-slider')) {
-                const val = parseInt(el.value);
-                const t = sys.tracks[tid];
-                t.grid[t.sel].note = val;
-                updatePitchLCD(tid, val);
-                renderGrid(tid);
-                const now = Date.now();
-                if(now - pThrottle > 100) {
-                    const eff = val + t.transpose + parseInt(sys.globalTranspose);
-                    triggerNote(tid, eff, sys.ctx.currentTime, 0.15);
-                    pThrottle = now;
-                }
-            }
-            if(el.classList.contains('trans-slider')) {
-                sys.tracks[tid].transpose = parseInt(el.value);
-                renderGrid(tid);
-            }
-        });
+            if(!(el instanceof HTMLInputElement) || el.type !== 'range') return;
+            const val = parseInt(el.value);
+            pendingSliders.set(el, val);
+            if(!sliderFrame) sliderFrame = requestAnimationFrame(applySliderChanges);
+        }, { passive: true });
 
         document.body.addEventListener('click', (e) => {
             const el = e.target;
-            
+            const tWrap = el.closest('.track-section');
+            if(tWrap) setActiveTrack(parseInt(tWrap.id.replace('track-sec-','')));
+
             if(el.classList.contains('btn-min')) {
                 const tid = parseInt(el.dataset.track);
                 const body = document.getElementById('tbody-'+tid);
@@ -796,7 +1012,9 @@
                     });
                     sel.disabled = false;
                 });
-                ui.globalLcd.innerText = f.name.substring(0,8).toUpperCase();
+                const label = f.name.substring(0,8).toUpperCase();
+                ui.globalLcd.innerText = label;
+                ui.globalLcd.dataset.fileLabel = label;
             };
             r.readAsArrayBuffer(f);
         };
@@ -824,10 +1042,15 @@
                 const num = size/46;
                 for(let i=0; i<num; i++) {
                     const b=shdr+(i*46);
-                    let nm=""; for(let j=0;j<20;j++){let c=dv.getUint8(b+j);if(c===0)break;nm+=String.fromCharCode(c);}
+                    let nm=""; for(let j=0;j<20;j++){let c=dv.getUint8(b+j);if(c===0)break;nm+=String.fromCharCode(c);}    
                     if(nm!=="EOS") sys.samples.push({
-                        name:nm, start:dv.getUint32(b+20,true), end:dv.getUint32(b+24,true),
-                        rate:dv.getUint32(b+36,true), root:dv.getUint8(b+40)
+                        name:nm,
+                        start:dv.getUint32(b+20,true),
+                        end:dv.getUint32(b+24,true),
+                        loopStart:dv.getUint32(b+28,true),
+                        loopEnd:dv.getUint32(b+32,true),
+                        rate:dv.getUint32(b+36,true),
+                        root:dv.getUint8(b+40)
                     });
                 }
             }
