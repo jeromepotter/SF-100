@@ -193,7 +193,9 @@
         /* --- SLIDERS --- */
         input[type=range] {
             -webkit-appearance: none; background: transparent;
-            touch-action: none; 
+            touch-action: pan-x pan-y;
+            min-height: 32px;
+            padding: 8px 0;
         }
         input[type=range]:focus { outline: none; }
 
@@ -205,30 +207,30 @@
         .fader-label { font-size: 8px; font-weight: bold; color: #222; margin-top: 2px; }
         
         input[type=range].vertical {
-            -webkit-appearance: slider-vertical; width: 30px; height: 100%; cursor: pointer;
+            -webkit-appearance: slider-vertical; width: 36px; height: 100%; cursor: pointer;
         }
 
         input[type=range].horiz {
-            width: 100%; height: 30px; margin: 0;
+            width: 100%; height: 36px; margin: 0;
         }
         input[type=range].horiz::-webkit-slider-runnable-track {
-            height: 8px; background: #222; border: 1px inset; border-radius: 4px;
+            height: 10px; background: #222; border: 1px inset; border-radius: 5px;
         }
         input[type=range].horiz::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 22px; height: 22px; 
-            background: #ccc; border: 2px outset #eee; 
-            margin-top: -8px; border-radius: 2px;
+            -webkit-appearance: none; width: 28px; height: 28px;
+            background: #ccc; border: 2px outset #eee;
+            margin-top: -10px; border-radius: 6px;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
         }
         
         input[type=range].mini-vol {
-            width: 60px; height: 20px;
+            width: 72px; height: 28px;
         }
         input[type=range].mini-vol::-webkit-slider-runnable-track {
-            height: 4px; background: #999; border: 1px solid #555;
+            height: 10px; background: #999; border: 1px solid #555; border-radius: 6px;
         }
         input[type=range].mini-vol::-webkit-slider-thumb {
-            width: 12px; height: 12px; margin-top: -5px; background: #fff; border: 1px solid #000;
+            width: 20px; height: 20px; margin-top: -6px; background: #fff; border: 1px solid #000; border-radius: 50%;
         }
 
         /* --- GRID --- */
@@ -898,35 +900,48 @@
         }
 
         let pThrottle = 0;
+        let sliderFrame = null;
+        const pendingSliders = new Map();
+
+        function applySliderChanges() {
+            pendingSliders.forEach((val, el) => {
+                const tid = parseInt(el.dataset.track);
+
+                if(el.classList.contains('mini-vol')) {
+                    sys.tracks[tid].gain = val / 100;
+                }
+                if(el.dataset.param) {
+                    sys.tracks[tid].env[el.dataset.param] = val;
+                }
+                if(el.classList.contains('pitch-slider')) {
+                    const t = sys.tracks[tid];
+                    t.grid[t.sel].note = val;
+                    updatePitchLCD(tid, val);
+                    renderGrid(tid);
+                    const now = Date.now();
+                    if(now - pThrottle > 100) {
+                        const eff = val + t.transpose + parseInt(sys.globalTranspose);
+                        triggerNote(tid, eff, sys.ctx.currentTime, 0.15);
+                        pThrottle = now;
+                    }
+                }
+                if(el.classList.contains('trans-slider')) {
+                    sys.tracks[tid].transpose = val;
+                    renderGrid(tid);
+                }
+            });
+
+            pendingSliders.clear();
+            sliderFrame = null;
+        }
 
         document.body.addEventListener('input', (e) => {
             const el = e.target;
-            const tid = parseInt(el.dataset.track);
-            
-            if(el.classList.contains('mini-vol')) {
-                sys.tracks[tid].gain = parseInt(el.value) / 100;
-            }
-            if(el.dataset.param) {
-                sys.tracks[tid].env[el.dataset.param] = parseInt(el.value);
-            }
-            if(el.classList.contains('pitch-slider')) {
-                const val = parseInt(el.value);
-                const t = sys.tracks[tid];
-                t.grid[t.sel].note = val;
-                updatePitchLCD(tid, val);
-                renderGrid(tid);
-                const now = Date.now();
-                if(now - pThrottle > 100) {
-                    const eff = val + t.transpose + parseInt(sys.globalTranspose);
-                    triggerNote(tid, eff, sys.ctx.currentTime, 0.15);
-                    pThrottle = now;
-                }
-            }
-            if(el.classList.contains('trans-slider')) {
-                sys.tracks[tid].transpose = parseInt(el.value);
-                renderGrid(tid);
-            }
-        });
+            if(!(el instanceof HTMLInputElement) || el.type !== 'range') return;
+            const val = parseInt(el.value);
+            pendingSliders.set(el, val);
+            if(!sliderFrame) sliderFrame = requestAnimationFrame(applySliderChanges);
+        }, { passive: true });
 
         document.body.addEventListener('click', (e) => {
             const el = e.target;
