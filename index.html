@@ -437,7 +437,10 @@
             recordChunks: [],
             recordMime: 'audio/wav',
             mediaDest: null,
-            recording: false
+            recording: false,
+            recordBuffers: { left: [], right: [] },
+            recordNode: null,
+            recordReady: false
         };
 
         const ui = {
@@ -534,22 +537,99 @@
         }
 
         // --- RECORDING ---
-        function preferredRecorderMime() {
-            const candidates = ['audio/wav', 'audio/webm;codecs=pcm', 'audio/webm'];
-            return candidates.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+        const recorderWorklet = `
+            class SfRecorder extends AudioWorkletProcessor {
+                process(inputs, outputs) {
+                    const input = inputs[0];
+                    const output = outputs[0];
+                    if (!input || input.length === 0) return true;
+                    const left = input[0];
+                    const right = input[1] || input[0];
+
+                    const lCopy = new Float32Array(left);
+                    const rCopy = new Float32Array(right);
+                    this.port.postMessage({ left: lCopy, right: rCopy });
+
+                    for (let ch = 0; ch < output.length; ch++) {
+                        output[ch].set(input[ch] || input[0]);
+                    }
+                    return true;
+                }
+            }
+            registerProcessor('sf-recorder', SfRecorder);
+        `;
+
+        function mergeBuffers(buffers) {
+            const total = buffers.reduce((sum, b) => sum + b.length, 0);
+            const out = new Float32Array(total);
+            let offset = 0;
+            for (const b of buffers) { out.set(b, offset); offset += b.length; }
+            return out;
         }
 
-        function setupRecorder() {
-            try {
-                sys.mediaDest = sys.ctx.createMediaStreamDestination();
-                sys.mainGain.connect(sys.mediaDest);
+        function interleaveStereo(left, right) {
+            const length = left.length + right.length;
+            const interleaved = new Float32Array(length);
+            let idx = 0;
+            for(let i = 0; i < left.length; i++) {
+                interleaved[idx++] = left[i];
+                interleaved[idx++] = right[i];
+            }
+            return interleaved;
+        }
 
-                const mime = preferredRecorderMime();
-                sys.recordMime = mime || 'audio/wav';
-                sys.recorder = new MediaRecorder(sys.mediaDest.stream, mime ? { mimeType: mime } : {});
-                sys.recorder.ondataavailable = (e) => { if(e.data.size > 0) sys.recordChunks.push(e.data); };
-                sys.recorder.onstop = finalizeRecording;
+        function encodeWav(buffers, sampleRate) {
+            const left = mergeBuffers(buffers.left);
+            const right = mergeBuffers(buffers.right);
+            const interleaved = interleaveStereo(left, right);
+            const dataLength = interleaved.length * 2;
+            const buffer = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(buffer);
+
+            function writeString(offset, str) { for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + dataLength, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true); // PCM chunk size
+            view.setUint16(20, 1, true);  // linear PCM
+            view.setUint16(22, 2, true);  // channels
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 4, true); // byte rate
+            view.setUint16(32, 4, true);  // block align
+            view.setUint16(34, 16, true); // bits per sample
+            writeString(36, 'data');
+            view.setUint32(40, dataLength, true);
+
+            let offset = 44;
+            for(let i = 0; i < interleaved.length; i++) {
+                let s = Math.max(-1, Math.min(1, interleaved[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                offset += 2;
+            }
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        async function setupRecorder() {
+            try {
+                if(!sys.ctx.audioWorklet) throw new Error('AudioWorklet unsupported');
+                const workletUrl = URL.createObjectURL(new Blob([recorderWorklet], { type: 'application/javascript' }));
+                await sys.ctx.audioWorklet.addModule(workletUrl);
+                sys.recordNode = new AudioWorkletNode(sys.ctx, 'sf-recorder', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
+                sys.recordNode.port.onmessage = ({ data }) => {
+                    if(!sys.recording) return;
+                    sys.recordBuffers.left.push(data.left);
+                    sys.recordBuffers.right.push(data.right);
+                };
+
+                sys.mainGain.disconnect();
+                sys.mainGain.connect(sys.recordNode);
+                sys.recordNode.connect(sys.analyser);
+
+                sys.recordReady = true;
                 ui.rec.disabled = false;
+                ui.rec.title = 'Record 16-bit WAV (stereo)';
             } catch(err) {
                 console.error('Recorder setup failed', err);
                 ui.rec.disabled = true;
@@ -565,8 +645,8 @@
         }
 
         function finalizeRecording() {
-            if(!sys.recordChunks.length) { resetRecordButton(); return; }
-            const blob = new Blob(sys.recordChunks, { type: sys.recordMime });
+            if(!sys.recordBuffers.left.length || !sys.recordBuffers.right.length) { resetRecordButton(); return; }
+            const blob = encodeWav(sys.recordBuffers, sys.ctx.sampleRate);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -575,8 +655,14 @@
             a.click();
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 10000);
-            sys.recordChunks = [];
+            sys.recordBuffers = { left: [], right: [] };
             resetRecordButton();
+        }
+
+        function stopRecording() {
+            if(!sys.recording) return;
+            sys.recording = false;
+            finalizeRecording();
         }
 
         // --- TRACK MANAGEMENT ---
@@ -922,7 +1008,7 @@
             sys.mainGain.connect(sys.analyser);
             sys.analyser.connect(sys.ctx.destination);
 
-            setupRecorder();
+            await setupRecorder();
 
             sys.ready = true;
             ui.init.style.display='none';
@@ -939,18 +1025,17 @@
             sys.playing = false; clearTimeout(sys.timer);
             ui.play.classList.remove('active');
             document.querySelectorAll('.step-pad').forEach(e => e.classList.remove('playing'));
-            if(sys.recording && sys.recorder && sys.recorder.state !== 'inactive') sys.recorder.stop();
+            if(sys.recording) stopRecording();
         };
         ui.rec.onclick = () => {
-            if(!sys.recorder) return;
+            if(!sys.recordReady) return;
             if(!sys.recording) {
-                sys.recordChunks = [];
+                sys.recordBuffers = { left: [], right: [] };
                 sys.recording = true;
                 ui.rec.classList.add('active');
                 ui.rec.innerText = '⏺ REC...';
-                sys.recorder.start();
             } else {
-                sys.recorder.stop();
+                stopRecording();
             }
         };
         ui.bpm.oninput = (e) => { sys.bpm = parseInt(e.target.value); ui.bpmDisp.innerText = sys.bpm; };
