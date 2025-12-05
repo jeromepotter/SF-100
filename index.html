@@ -97,6 +97,10 @@
         .btn-play { flex: 2; color: #006400; border-width: 3px; font-size: 14px; }
         .btn-stop { flex: 1; color: #8b0000; }
         .btn-init { flex: 3; background: #e0e080; border-color: #999; }
+        .btn-rec { flex: 2; color: #8b0000; background: #ffdede; border-color: #aa7777; position: relative; }
+        .btn-rec.recording { background: #ffb3b3; border-color: #c00; color: #600; }
+        .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #c00; display: inline-block; margin-right: 4px; box-shadow: 0 0 6px rgba(255,0,0,0.6); }
+        .rec-dot.idle { background: #700; box-shadow: none; }
 
         /* --- GLOBAL --- */
         .global-strip {
@@ -356,6 +360,7 @@
             <div id="transport-controls" style="display:none; width:100%; gap:8px;">
                 <button id="btn-play" class="btn-90s btn-play">► PLAY</button>
                 <button id="btn-stop" class="btn-90s btn-stop">■ STOP</button>
+                <button id="btn-rec" class="btn-90s btn-rec">● RECORD WAV</button>
             </div>
         </div>
 
@@ -432,7 +437,8 @@
             tracks: [],
             activeTrack: 0,
             midiVoices: {}, // Track active MIDI notes: key=note, val={src, gain, trackId, snapped}
-            activeMidiNotes: new Set()
+            activeMidiNotes: new Set(),
+            recorder: { active: false, length: 0, buffers: [], node: null, sampleRate: 44100 }
         };
 
         const ui = {
@@ -455,7 +461,8 @@
             midiPanel: document.getElementById('midi-panel'),
             midiDevice: document.getElementById('midi-device'),
             midiActive: document.getElementById('midi-active'),
-            midiPiano: document.getElementById('midi-piano')
+            midiPiano: document.getElementById('midi-piano'),
+            rec: document.getElementById('btn-rec')
         };
 
         ui.globalLcd.dataset.fileLabel = ui.globalLcd.innerText;
@@ -463,6 +470,7 @@
         const midiKeys = {};
         const PIANO_START = 48; // C3
         const PIANO_END = 84;   // B5
+        const REC_FILENAME_PREFIX = 'sf100-recording-';
 
         // --- MIDI SETUP ---
         if (navigator.requestMIDIAccess) {
@@ -870,10 +878,21 @@
             sys.mainGain.connect(sys.analyser);
             sys.analyser.connect(sys.ctx.destination);
 
+            sys.recorder.sampleRate = sys.ctx.sampleRate;
+            sys.recorder.node = sys.ctx.createScriptProcessor(4096, 1, 1);
+            sys.recorder.node.onaudioprocess = handleRecordBuffer;
+            sys.mainGain.connect(sys.recorder.node);
+            sys.recorder.node.connect(sys.ctx.destination);
+
             sys.ready = true;
             ui.init.style.display='none';
             ui.ctrls.style.display='flex';
             drawScope();
+        };
+
+        ui.rec.onclick = () => {
+            if(!sys.ready) return;
+            if(sys.recorder.active) stopRecording(); else startRecording();
         };
 
         ui.play.onclick = () => {
@@ -1066,6 +1085,73 @@
                 sel.appendChild(o);
             });
             sel.disabled = false;
+        }
+
+        function handleRecordBuffer(evt) {
+            if(!sys.recorder.active) return;
+            const input = evt.inputBuffer.getChannelData(0);
+            sys.recorder.buffers.push(new Float32Array(input));
+            sys.recorder.length += input.length;
+        }
+
+        function startRecording() {
+            sys.recorder.buffers = [];
+            sys.recorder.length = 0;
+            sys.recorder.active = true;
+            ui.rec.classList.add('recording');
+            ui.rec.innerHTML = '<span class="rec-dot"></span>STOP REC';
+        }
+
+        function stopRecording() {
+            sys.recorder.active = false;
+            ui.rec.classList.remove('recording');
+            ui.rec.innerHTML = '● RECORD WAV';
+            if(!sys.recorder.length) return;
+            const wav = exportWav(sys.recorder.buffers, sys.recorder.length, sys.recorder.sampleRate);
+            const ts = new Date().toISOString().replace(/[:.]/g, '-');
+            const url = URL.createObjectURL(wav);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${REC_FILENAME_PREFIX}${ts}.wav`;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+
+        function exportWav(buffers, length, sampleRate) {
+            const data = new Float32Array(length);
+            let offset = 0;
+            buffers.forEach(b => { data.set(b, offset); offset += b.length; });
+
+            const bytesPerSample = 2;
+            const blockAlign = bytesPerSample;
+            const buffer = new ArrayBuffer(44 + data.length * bytesPerSample);
+            const view = new DataView(buffer);
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + data.length * bytesPerSample, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // PCM chunk size
+            view.setUint16(20, 1, true); // PCM format
+            view.setUint16(22, 1, true); // Channels
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * blockAlign, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bytesPerSample * 8, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, data.length * bytesPerSample, true);
+
+            let idx = 44;
+            for(let i=0; i<data.length; i++, idx+=2) {
+                const s = Math.max(-1, Math.min(1, data[i]));
+                view.setInt16(idx, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, str) {
+            for(let i=0; i<str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
         }
 
         function drawScope() {
