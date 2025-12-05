@@ -96,6 +96,7 @@
         .btn-90s:active, .btn-90s.active { border: 2px inset #fff; background: #ccc; transform: translate(1px, 1px); }
         .btn-play { flex: 2; color: #006400; border-width: 3px; font-size: 14px; }
         .btn-stop { flex: 1; color: #8b0000; }
+        .btn-rec { flex: 1; color: #b00000; }
         .btn-init { flex: 3; background: #e0e080; border-color: #999; }
 
         /* --- GLOBAL --- */
@@ -354,6 +355,7 @@
             <div id="transport-controls" style="display:none; width:100%; gap:8px;">
                 <button id="btn-play" class="btn-90s btn-play">► PLAY</button>
                 <button id="btn-stop" class="btn-90s btn-stop">■ STOP</button>
+                <button id="btn-rec" class="btn-90s btn-rec">⏺ REC</button>
             </div>
         </div>
 
@@ -430,7 +432,12 @@
             tracks: [],
             activeTrack: 0,
             midiVoices: {}, // Track active MIDI notes: key=note, val={src, gain, trackId, snapped}
-            activeMidiNotes: new Set()
+            activeMidiNotes: new Set(),
+            recorder: null,
+            recordChunks: [],
+            recordMime: 'audio/wav',
+            mediaDest: null,
+            recording: false
         };
 
         const ui = {
@@ -439,6 +446,7 @@
             addBtn: document.getElementById('btn-add-track'),
             play: document.getElementById('btn-play'),
             stop: document.getElementById('btn-stop'),
+            rec: document.getElementById('btn-rec'),
             init: document.getElementById('btn-init'),
             ctrls: document.getElementById('transport-controls'),
             bpm: document.getElementById('bpm-slider'),
@@ -523,6 +531,52 @@
             const key = midiKeys[note];
             if(!key) return;
             if(on) key.classList.add('active'); else key.classList.remove('active');
+        }
+
+        // --- RECORDING ---
+        function preferredRecorderMime() {
+            const candidates = ['audio/wav', 'audio/webm;codecs=pcm', 'audio/webm'];
+            return candidates.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        function setupRecorder() {
+            try {
+                sys.mediaDest = sys.ctx.createMediaStreamDestination();
+                sys.mainGain.connect(sys.mediaDest);
+
+                const mime = preferredRecorderMime();
+                sys.recordMime = mime || 'audio/wav';
+                sys.recorder = new MediaRecorder(sys.mediaDest.stream, mime ? { mimeType: mime } : {});
+                sys.recorder.ondataavailable = (e) => { if(e.data.size > 0) sys.recordChunks.push(e.data); };
+                sys.recorder.onstop = finalizeRecording;
+                ui.rec.disabled = false;
+            } catch(err) {
+                console.error('Recorder setup failed', err);
+                ui.rec.disabled = true;
+                ui.rec.innerText = 'REC N/A';
+                ui.rec.title = 'Recording not supported in this browser';
+            }
+        }
+
+        function resetRecordButton() {
+            sys.recording = false;
+            ui.rec.classList.remove('active');
+            ui.rec.innerText = '⏺ REC';
+        }
+
+        function finalizeRecording() {
+            if(!sys.recordChunks.length) { resetRecordButton(); return; }
+            const blob = new Blob(sys.recordChunks, { type: sys.recordMime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sf-100-${new Date().toISOString().replace(/[:.]/g,'-')}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            sys.recordChunks = [];
+            resetRecordButton();
         }
 
         // --- TRACK MANAGEMENT ---
@@ -868,6 +922,8 @@
             sys.mainGain.connect(sys.analyser);
             sys.analyser.connect(sys.ctx.destination);
 
+            setupRecorder();
+
             sys.ready = true;
             ui.init.style.display='none';
             ui.ctrls.style.display='flex';
@@ -883,6 +939,19 @@
             sys.playing = false; clearTimeout(sys.timer);
             ui.play.classList.remove('active');
             document.querySelectorAll('.step-pad').forEach(e => e.classList.remove('playing'));
+            if(sys.recording && sys.recorder && sys.recorder.state !== 'inactive') sys.recorder.stop();
+        };
+        ui.rec.onclick = () => {
+            if(!sys.recorder) return;
+            if(!sys.recording) {
+                sys.recordChunks = [];
+                sys.recording = true;
+                ui.rec.classList.add('active');
+                ui.rec.innerText = '⏺ REC...';
+                sys.recorder.start();
+            } else {
+                sys.recorder.stop();
+            }
         };
         ui.bpm.oninput = (e) => { sys.bpm = parseInt(e.target.value); ui.bpmDisp.innerText = sys.bpm; };
         ui.key.onchange = (e) => { sys.root=e.target.value; refreshAllGrids(); };
