@@ -196,26 +196,47 @@
 
         /* --- SLIDERS --- */
         input[type=range] {
-            -webkit-appearance: none; background: transparent;
+            -webkit-appearance: none; background: linear-gradient(to right, #4fa86b 0%, #4fa86b var(--fill, 50%), #1f1f1f var(--fill, 50%), #1f1f1f 100%);
             touch-action: pan-x pan-y;
             min-height: 32px;
             padding: 8px 0;
+            border-radius: 12px;
+            border: 1px solid #1a1a1a;
         }
         input[type=range]:focus { outline: none; }
 
         .adsr-container {
-            display: flex; justify-content: space-between; height: 80px;
-            background: #bbb; border: 1px inset; padding: 4px;
+            display: flex; justify-content: space-between; height: 130px;
+            background: linear-gradient(180deg, #d5d5d5, #b3b3b3);
+            border: 1px inset; padding: 6px; border-radius: 6px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.25);
         }
         .fader-group { display: flex; flex-direction: column; align-items: center; flex: 1; }
-        .fader-label { font-size: 8px; font-weight: bold; color: #222; margin-top: 2px; }
-        
+        .fader-label { font-size: 9px; font-weight: bold; color: #111; margin-top: 6px; letter-spacing: 0.5px; }
+
         input[type=range].vertical {
-            -webkit-appearance: slider-vertical; width: 36px; height: 100%; cursor: pointer;
+            -webkit-appearance: none; width: 48px; height: 100%; cursor: pointer;
+            background: linear-gradient(to top, #1d1d1d, #2c2c2c);
+            border-radius: 14px; border: 1px solid #111; padding: 10px 14px;
+        }
+        input[type=range].vertical::-webkit-slider-runnable-track {
+            width: 12px; height: 100%; background: transparent;
+        }
+        input[type=range].vertical::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 22px; height: 22px; border-radius: 8px;
+            background: linear-gradient(180deg, #fff, #c8c8c8);
+            border: 1px solid #555; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            margin-left: -5px;
+        }
+
+        input[type=range].vertical::-moz-range-track { background: transparent; border: none; }
+        input[type=range].vertical::-moz-range-thumb {
+            width: 22px; height: 22px; border-radius: 8px; border: 1px solid #555; background: linear-gradient(180deg, #fff, #c8c8c8);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
         }
 
         input[type=range].horiz {
-            width: 100%; height: 36px; margin: 0;
+            width: 100%; height: 36px; margin: 0; border-radius: 10px;
         }
         input[type=range].horiz::-webkit-slider-runnable-track {
             height: 10px; background: #222; border: 1px inset; border-radius: 5px;
@@ -282,6 +303,22 @@
             padding: 8px;
             z-index: 45;
         }
+        .fx-rack {
+            background: #9b9b9b;
+            border-bottom: 2px solid var(--win-darker);
+            border-top: 2px solid var(--win-darker);
+            padding: 8px;
+            display: grid;
+            gap: 8px;
+        }
+        .fx-row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+        .fx-module { background: rgba(255,255,255,0.35); border: 2px inset #666; padding: 8px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); }
+        .fx-title { font-size: 12px; font-weight: bold; color: #000; margin-bottom: 6px; text-shadow: 1px 1px 0 #ddd; }
+        .fx-controls { display: grid; gap: 6px; }
+        .fx-control-row { display: flex; align-items: center; gap: 8px; }
+        .fx-control-row span { font-size: 10px; font-weight: bold; width: 70px; }
+        .send-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin-top: 6px; }
+        .send-row span { font-size: 10px; font-weight: bold; }
         .midi-row {
             display: flex;
             align-items: center;
@@ -408,6 +445,52 @@
             <div class="piano" id="midi-piano"></div>
         </div>
 
+        <!-- FX RACK -->
+        <div class="fx-rack" id="fx-rack">
+            <div class="fx-row">
+                <div class="fx-module">
+                    <div class="fx-title">REVERB SEND / TAL-STYLE PLATE</div>
+                    <div class="fx-controls">
+                        <div class="fx-control-row">
+                            <span>PRE-DELAY</span>
+                            <input type="range" class="horiz fx-param" data-fx="reverb" data-param="preDelay" min="0" max="120" value="35">
+                            <span id="fx-r-pre">35ms</span>
+                        </div>
+                        <div class="fx-control-row">
+                            <span>DECAY</span>
+                            <input type="range" class="horiz fx-param" data-fx="reverb" data-param="decay" min="10" max="50" value="32">
+                            <span id="fx-r-decay">3.2s</span>
+                        </div>
+                        <div class="fx-control-row">
+                            <span>TONE</span>
+                            <input type="range" class="horiz fx-param" data-fx="reverb" data-param="tone" min="2000" max="14000" value="6500">
+                            <span id="fx-r-tone">6.5k</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="fx-module">
+                    <div class="fx-title">PING-PONG DELAY SEND</div>
+                    <div class="fx-controls">
+                        <div class="fx-control-row">
+                            <span>TIME</span>
+                            <input type="range" class="horiz fx-param" data-fx="delay" data-param="time" min="80" max="800" value="320">
+                            <span id="fx-d-time">320ms</span>
+                        </div>
+                        <div class="fx-control-row">
+                            <span>FEEDBACK</span>
+                            <input type="range" class="horiz fx-param" data-fx="delay" data-param="feedback" min="0" max="90" value="38">
+                            <span id="fx-d-fb">38%</span>
+                        </div>
+                        <div class="fx-control-row">
+                            <span>TONE</span>
+                            <input type="range" class="horiz fx-param" data-fx="delay" data-param="tone" min="1500" max="14000" value="9000">
+                            <span id="fx-d-tone">9.0k</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- WORKSPACE -->
         <div class="workspace" id="track-container">
             <!-- Dynamic Tracks -->
@@ -438,7 +521,11 @@
             activeTrack: 0,
             midiVoices: {}, // Track active MIDI notes: key=note, val={src, gain, trackId, snapped}
             activeMidiNotes: new Set(),
-            recorder: { active: false, length: 0, buffers: [], node: null, sampleRate: 44100 }
+            recorder: { active: false, length: 0, buffers: [], node: null, sampleRate: 44100 },
+            fx: {
+                reverb: { preDelay: 35, decay: 3.2, tone: 6500, nodes: {} },
+                delay: { time: 0.32, feedback: 0.38, tone: 9000, nodes: {} }
+            }
         };
 
         const ui = {
@@ -518,6 +605,20 @@
             return name + oct;
         }
 
+        function paintRange(el) {
+            const min = parseFloat(el.min || 0);
+            const max = parseFloat(el.max || 100);
+            const val = parseFloat(el.value || 0);
+            const pct = ((val - min) / (max - min)) * 100;
+            const dir = el.classList.contains('vertical') ? 'to top' : 'to right';
+            el.style.setProperty('--fill', `${pct}%`);
+            el.style.background = `linear-gradient(${dir}, #4fa86b 0%, #4fa86b ${pct}%, #1f1f1f ${pct}%, #1f1f1f 100%)`;
+        }
+
+        function paintAllRanges() {
+            document.querySelectorAll('input[type=range]').forEach(paintRange);
+        }
+
         function refreshMidiReadout() {
             const active = Array.from(sys.activeMidiNotes).sort((a,b) => a-b);
             const text = active.length ? active.map(midiNoteLabel).join(' ') : '---';
@@ -544,9 +645,10 @@
                 mode: 'synth', 
                 wave: id%2===0 ? 'sine' : 'square',
                 sampleIdx: 0, 
-                env: {a:5, d:20, s:70, r:40}, 
+                env: {a:5, d:20, s:70, r:40},
                 transpose: 0,
-                gain: 0.8, 
+                gain: 0.8,
+                fxSend: { reverb: 0.25, delay: 0.15 },
                 minimized: false
             };
             
@@ -586,10 +688,20 @@
                             </select>
                         </div>
                         <div class="adsr-container">
-                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="a" min="0" max="100" value="5"><span class="fader-label">A</span></div>
-                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="d" min="0" max="100" value="20"><span class="fader-label">D</span></div>
-                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="s" min="0" max="100" value="70"><span class="fader-label">S</span></div>
-                            <div class="fader-group"><input type="range" class="vertical" data-track="${id}" data-param="r" min="0" max="100" value="40"><span class="fader-label">R</span></div>
+                            <div class="fader-group"><input type="range" class="vertical env-slider" data-track="${id}" data-param="a" min="0" max="100" value="5"><span class="fader-label">A</span></div>
+                            <div class="fader-group"><input type="range" class="vertical env-slider" data-track="${id}" data-param="d" min="0" max="100" value="20"><span class="fader-label">D</span></div>
+                            <div class="fader-group"><input type="range" class="vertical env-slider" data-track="${id}" data-param="s" min="0" max="100" value="70"><span class="fader-label">S</span></div>
+                            <div class="fader-group"><input type="range" class="vertical env-slider" data-track="${id}" data-param="r" min="0" max="100" value="40"><span class="fader-label">R</span></div>
+                        </div>
+                        <div class="send-row">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span>REV</span>
+                                <input type="range" class="horiz mini-vol send-slider" data-track="${id}" data-send="reverb" min="0" max="100" value="25">
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span>DLY</span>
+                                <input type="range" class="horiz mini-vol send-slider" data-track="${id}" data-send="delay" min="0" max="100" value="15">
+                            </div>
                         </div>
                     </div>
 
@@ -618,6 +730,7 @@
             div.innerHTML = html;
             ui.trackContainer.insertBefore(div.firstElementChild, ui.addArea);
             if(sys.samples.length > 0) populateSelect(id);
+            paintAllRanges();
         }
 
         ui.addBtn.onclick = () => {
@@ -730,6 +843,92 @@
             return buffer;
         }
 
+        function setupFX() {
+            const ctx = sys.ctx;
+            // Reverb (plate-style impulse)
+            const revSend = ctx.createGain();
+            const revPre = ctx.createDelay(1.0);
+            const revConvolver = ctx.createConvolver();
+            const revTone = ctx.createBiquadFilter();
+            const revOut = ctx.createGain();
+            revTone.type = 'lowpass';
+            revOut.gain.value = 1.0;
+            revSend.connect(revPre);
+            revPre.connect(revConvolver);
+            revConvolver.connect(revTone);
+            revTone.connect(revOut);
+            revOut.connect(sys.mainGain);
+
+            sys.fx.reverb.nodes = { send: revSend, pre: revPre, convolver: revConvolver, tone: revTone };
+            rebuildReverbImpulse();
+
+            // Ping-pong delay
+            const dSend = ctx.createGain();
+            const dLeft = ctx.createDelay(2.0);
+            const dRight = ctx.createDelay(2.0);
+            const fbLeft = ctx.createGain();
+            const fbRight = ctx.createGain();
+            const panLeft = ctx.createStereoPanner(); panLeft.pan.value = -0.6;
+            const panRight = ctx.createStereoPanner(); panRight.pan.value = 0.6;
+            const dTone = ctx.createBiquadFilter(); dTone.type = 'lowpass';
+            const dOut = ctx.createGain();
+
+            dSend.connect(dLeft);
+            dSend.connect(dRight);
+            dLeft.connect(panLeft); panLeft.connect(dTone);
+            dRight.connect(panRight); panRight.connect(dTone);
+            dTone.connect(dOut);
+            dOut.connect(sys.mainGain);
+
+            dLeft.connect(fbRight);
+            dRight.connect(fbLeft);
+            fbLeft.connect(dLeft);
+            fbRight.connect(dRight);
+
+            sys.fx.delay.nodes = { send: dSend, left: dLeft, right: dRight, fbLeft, fbRight, tone: dTone };
+            applyFxParams();
+        }
+
+        function rebuildReverbImpulse() {
+            if(!sys.ctx) return;
+            const ctx = sys.ctx;
+            const seconds = Math.max(0.5, sys.fx.reverb.decay);
+            const length = Math.floor(ctx.sampleRate * (seconds + 0.2));
+            const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+
+            for(let ch=0; ch<2; ch++) {
+                const data = buffer.getChannelData(ch);
+                for(let i=0; i<length; i++) {
+                    const decay = Math.pow(1 - i/length, 1.5);
+                    const noise = (Math.random()*2-1) * decay;
+                    data[i] = noise * 0.65;
+                }
+            }
+
+            const nodes = sys.fx.reverb.nodes;
+            if(nodes.convolver) nodes.convolver.buffer = buffer;
+            applyFxParams();
+        }
+
+        function applyFxParams() {
+            const { reverb, delay } = sys.fx;
+            if(reverb.nodes.pre) reverb.nodes.pre.delayTime.value = reverb.preDelay / 1000;
+            if(reverb.nodes.tone) reverb.nodes.tone.frequency.value = reverb.tone;
+
+            document.getElementById('fx-r-pre').innerText = `${reverb.preDelay}ms`;
+            document.getElementById('fx-r-decay').innerText = `${reverb.decay.toFixed(1)}s`;
+            document.getElementById('fx-r-tone').innerText = `${(reverb.tone/1000).toFixed(1)}k`;
+
+            const d = delay.nodes;
+            if(d.left) { d.left.delayTime.value = delay.time; d.right.delayTime.value = delay.time * 1.05; }
+            if(d.fbLeft) { d.fbLeft.gain.value = delay.feedback; d.fbRight.gain.value = delay.feedback; }
+            if(d.tone) d.tone.frequency.value = delay.tone;
+
+            document.getElementById('fx-d-time').innerText = `${Math.round(delay.time*1000)}ms`;
+            document.getElementById('fx-d-fb').innerText = `${Math.round(delay.feedback*100)}%`;
+            document.getElementById('fx-d-tone').innerText = `${(delay.tone/1000).toFixed(1)}k`;
+        }
+
         function playSound(tIdx, note, time, gateDuration, isMidi) {
             const t = sys.tracks[tIdx];
             const freq = 440 * Math.pow(2, (note-69)/12);
@@ -787,8 +986,22 @@
                 src.start(time);
             }
 
-            src.connect(gain); gain.connect(sys.mainGain);
-            
+            src.connect(gain);
+            gain.connect(sys.mainGain);
+
+            if(sys.fx.reverb.nodes.send) {
+                const send = sys.ctx.createGain();
+                send.gain.value = t.fxSend.reverb;
+                gain.connect(send);
+                send.connect(sys.fx.reverb.nodes.send);
+            }
+            if(sys.fx.delay.nodes.send) {
+                const send = sys.ctx.createGain();
+                send.gain.value = t.fxSend.delay;
+                gain.connect(send);
+                send.connect(sys.fx.delay.nodes.send);
+            }
+
             return { src, gain };
         }
 
@@ -862,6 +1075,7 @@
 
         // --- INIT ---
         createTrack(0);
+        paintAllRanges();
 
         ui.init.onclick = async () => {
             const AC = window.AudioContext || window.webkitAudioContext;
@@ -877,6 +1091,8 @@
             sys.analyser.fftSize = 256;
             sys.mainGain.connect(sys.analyser);
             sys.analyser.connect(sys.ctx.destination);
+
+            setupFX();
 
             sys.recorder.sampleRate = sys.ctx.sampleRate;
             sys.recorder.node = sys.ctx.createScriptProcessor(4096, 1, 1);
@@ -924,7 +1140,33 @@
 
         function applySliderChanges() {
             pendingSliders.forEach((val, el) => {
-                const tid = parseInt(el.dataset.track);
+                paintRange(el);
+                if(el.classList.contains('fx-param')) {
+                    const group = el.dataset.fx;
+                    const param = el.dataset.param;
+                    if(group === 'reverb') {
+                        if(param === 'preDelay') sys.fx.reverb.preDelay = val;
+                        if(param === 'decay') sys.fx.reverb.decay = val / 10;
+                        if(param === 'tone') sys.fx.reverb.tone = val;
+                        document.getElementById('fx-r-pre').innerText = `${sys.fx.reverb.preDelay}ms`;
+                        document.getElementById('fx-r-decay').innerText = `${sys.fx.reverb.decay.toFixed(1)}s`;
+                        document.getElementById('fx-r-tone').innerText = `${(sys.fx.reverb.tone/1000).toFixed(1)}k`;
+                        rebuildReverbImpulse();
+                    }
+                    if(group === 'delay') {
+                        if(param === 'time') sys.fx.delay.time = val / 1000;
+                        if(param === 'feedback') sys.fx.delay.feedback = Math.min(0.9, val/100);
+                        if(param === 'tone') sys.fx.delay.tone = val;
+                        document.getElementById('fx-d-time').innerText = `${val}ms`;
+                        document.getElementById('fx-d-fb').innerText = `${val}%`;
+                        document.getElementById('fx-d-tone').innerText = `${(sys.fx.delay.tone/1000).toFixed(1)}k`;
+                        applyFxParams();
+                    }
+                    return;
+                }
+
+                const tid = el.dataset.track !== undefined ? parseInt(el.dataset.track) : null;
+                if(Number.isNaN(tid)) return;
 
                 if(el.classList.contains('mini-vol')) {
                     sys.tracks[tid].gain = val / 100;
@@ -947,6 +1189,11 @@
                 if(el.classList.contains('trans-slider')) {
                     sys.tracks[tid].transpose = val;
                     renderGrid(tid);
+                }
+                if(el.classList.contains('send-slider')) {
+                    const amt = Math.min(1, Math.max(0, val/100));
+                    if(el.dataset.send === 'reverb') sys.tracks[tid].fxSend.reverb = amt;
+                    if(el.dataset.send === 'delay') sys.tracks[tid].fxSend.delay = amt;
                 }
             });
 
